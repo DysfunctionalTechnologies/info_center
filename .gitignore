@@ -1,0 +1,21 @@
+cat > .gitignore << 'EOF'
+# machine identity — never push
+.web_auth
+.platform
+.platform.tmp
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# editor / os
+.DS_Store
+*.swp
+*~
+
+# local junk
+*.log
+*.tmp
+EOF
