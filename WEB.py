@@ -44,7 +44,6 @@ from   PANEL          import power_on
 from   PANEL          import power_off
 from   PANEL          import mark_dirty
 from   PLATFORM       import load_platform
-from   PLATFORM       import save_platform
 from   PLATFORM       import PLATFORM_PATH
 from   WEB_login      import HTML_LOGIN
 from   WEB_html       import HTML
@@ -386,14 +385,14 @@ def diag():
         return redirect("/login")
     if not is_tech():
         return redirect("/")
-    cfg, present = load_platform()
+    plat, plat_present = load_platform()
     return render_template_string(
         HTML_DIAG,
-        plat=cfg,
-        plat_present=present,
+        plat=plat,
+        plat_present=plat_present,
         plat_path=PLATFORM_PATH,
     )
-
+    
 @app.route("/logs")
 def logs_page():
     if not is_authenticated():
@@ -474,44 +473,20 @@ def status():
         "alert_quake_yellow": a_qy,
         "alert_quake_red": a_qr,
         "role": session.get("role"),
-        "exchange_base": getattr(info_center, "exchange_base", "USD"),
-        "exchange_quote": getattr(info_center, "exchange_quote", "PHP"),
-        "exchange_rate": float(getattr(info_center, "exchange_rate", 0.0)),        
+        "exchange_primary":   getattr(info_center, "exchange_primary",
+                              getattr(info_center, "exchange_base", "USD")),
+        "exchange_secondary": getattr(info_center, "exchange_secondary",
+                              getattr(info_center, "exchange_quote", "PHP")),
+        "exchange_base":      getattr(info_center, "exchange_primary",
+                              getattr(info_center, "exchange_base", "USD")),
+        "exchange_quote":     getattr(info_center, "exchange_secondary",
+                              getattr(info_center, "exchange_quote", "PHP")),
+        "pair_rate":          float(getattr(info_center, "pair_rate", 0.0) or 0.0),
+        "usd_to_primary":     float(getattr(info_center, "usd_to_primary", 0.0) or 0.0),
+        "primary_valid":      bool(getattr(info_center, "primary_valid", True)),
+        "secondary_valid":    bool(getattr(info_center, "secondary_valid", True)),
     })
 
-@app.route("/set_exchange_pair", methods=["POST"])
-def route_set_exchange_pair():
-    if not is_authenticated():
-        return _deny_json()
-
-    def norm(raw, fallback):
-        s = "".join(ch for ch in str(raw).upper() if "A" <= ch <= "Z")
-        return s[:3] if len(s) == 3 else fallback
-
-    base  = norm(request.args.get("base", ""), "USD")
-    quote = norm(request.args.get("quote", ""), "PHP")
-    if base == quote:
-        return status()
-
-    with info_center.lock:
-        changed = (info_center.exchange_base != base or
-                   info_center.exchange_quote != quote)
-        info_center.exchange_base = base
-        info_center.exchange_quote = quote
-        if changed:
-            info_center.exchange_rate = 0.0
-            info_center.last_exchange_rate = 0.0
-            info_center.exchange_last_update = 0.0
-            info_center.exchange.last_built = 0.0
-
-    if changed:
-        try:
-            fetch_exchange()
-        except Exception:
-            logger.exception("Exchange refetch after pair change failed")
-    logger.info("Exchange pair → %s/%s", base, quote)
-    return status()
-    
 @app.route("/set_globe_push", methods=["POST"])
 def route_set_globe_push():
     if not is_authenticated():
@@ -519,11 +494,6 @@ def route_set_globe_push():
     raw = str(request.args.get("value", "0")).lower()
     enabled = raw in ("1", "true", "yes", "on")
     info_center.globe_push_enabled = enabled
-    try:
-        from PLATFORM import save_platform
-        save_platform({"GLOBE_PUSH": "1" if enabled else "0"})
-    except Exception:
-        logger.warning("platform GLOBE_PUSH save failed", exc_info=True)
     from GLOBE_LINK import push_globe
     if enabled:
         push_globe(force=True)
@@ -531,6 +501,41 @@ def route_set_globe_push():
         push_globe(force=True, mode="OFF")
     save_persisted()
     logger.info("Globe push → %s", enabled)
+    return status()
+
+@app.route("/set_exchange_pair", methods=["POST"])
+def route_set_exchange_pair():
+    if not is_authenticated():
+        return _deny_json()
+    cur_p = getattr(info_center, "exchange_primary",
+                    getattr(info_center, "exchange_base", "USD"))
+    cur_s = getattr(info_center, "exchange_secondary",
+                    getattr(info_center, "exchange_quote", "PHP"))
+    raw_p = request.args.get("primary", request.args.get("base"))
+    raw_s = request.args.get("secondary", request.args.get("quote"))
+    if raw_p is None:
+        primary = cur_p
+    else:
+        primary = "".join(ch for ch in str(raw_p).upper() if "A" <= ch <= "Z")[:3] or cur_p
+    if raw_s is None:
+        secondary = cur_s
+    else:
+        secondary = "".join(ch for ch in str(raw_s).upper() if "A" <= ch <= "Z")[:3] or cur_s
+    with info_center.lock:
+        info_center.exchange_primary   = primary
+        info_center.exchange_secondary = secondary
+        info_center.exchange_base      = primary
+        info_center.exchange_quote     = secondary
+        info_center.usd_to_primary     = 0.0
+        info_center.usd_to_secondary   = 0.0
+        info_center.pair_rate          = 0.0
+        info_center.exchange_rate      = 0.0
+        info_center.primary_valid      = True
+        info_center.secondary_valid    = True
+        info_center.exchange.last_built = 0.0
+        info_center.oil.last_built      = 0.0
+    logger.info("FX pair RAM → %s / %s (not persisted)", primary, secondary)
+    threading.Thread(target=fetch_exchange, name="FXPairFetch", daemon=True).start()
     return status()
     
 @app.route("/set_debug", methods=["POST"])
@@ -744,42 +749,6 @@ def route_alert_quake_red():
     logger.info("Web quake red toggle → %s", on)
     return status()
 
-def _platform_fields_from_request():
-    return {
-        "PANEL_LAYOUT": request.form.get("PANEL_LAYOUT", "16x16"),
-        "GPIO_PIN": request.form.get("GPIO_PIN", "21"),
-        "GLOBE_PUSH": "1" if request.form.get("GLOBE_PUSH") else "0",
-        "GLOBE_HOST": request.form.get("GLOBE_HOST", "192.168.0.223"),
-        "DIAG_BRIGHTNESS": request.form.get("DIAG_BRIGHTNESS", ""),
-        "DISPLAY_NAME": request.form.get("DISPLAY_NAME", ""),
-    }
-
-
-@app.route("/platform_save", methods=["POST"])
-def route_platform_save():
-    if not is_tech():
-        return redirect("/")
-    cfg = save_platform(_platform_fields_from_request())
-    info_center.panel_layout = cfg["PANEL_LAYOUT"]
-    info_center.strip_gpio = int(cfg["GPIO_PIN"])
-    info_center.globe_push_enabled = cfg["GLOBE_PUSH"] == "1"
-    save_persisted()
-    logger.info("Platform saved %s gpio=%s globe=%s",
-                cfg["PANEL_LAYOUT"], cfg["GPIO_PIN"], cfg["GLOBE_PUSH"])
-    return redirect("/diag")
-
-
-@app.route("/platform_save_reboot", methods=["POST"])
-def route_platform_save_reboot():
-    if not is_tech():
-        return redirect("/")
-    if request.form.get("confirm") != "REBOOT":
-        return redirect("/diag")
-    route_platform_save()
-    logger.info("Platform saved – rebooting")
-    os.system("sudo /sbin/reboot")
-    return "Rebooting...", 200
-    
 _web_started = False
 
 def start_web():

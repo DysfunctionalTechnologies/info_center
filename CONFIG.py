@@ -313,9 +313,16 @@ class InfoCenterState:
         self.exchange_last_update     = 0.0
         self.exchange_update_interval = EXCHANGE_UPDATE_INTERVAL
         self.last_exchange_rate       = 0.0
-        self.exchange_base            = "USD"
-        self.exchange_quote           = "PHP"
-        
+        self.exchange_primary         = "USD"
+        self.exchange_secondary       = "PHP"
+        self.exchange_base            = "USD"   # alias of primary
+        self.exchange_quote           = "PHP"   # alias of secondary
+        self.usd_to_primary           = 1.0
+        self.usd_to_secondary         = 0.0
+        self.pair_rate                = 0.0
+        self.primary_valid            = True
+        self.secondary_valid          = True
+                
         self.oil_wti                  = 0.0
         self.oil_brent                = 0.0
         self.oil_urals                = 0.0

@@ -34,11 +34,17 @@ from   PANEL          import continuous_scroll_message
 
 logger = logging.getLogger(__name__)
 
-def _fmt_price(usd):
-    """Return (usd_str, php_str) with 2 decimals"""
-    php = usd * info_center.exchange_rate
-    return f"{usd:.2f}", f"{php:.2f}"
+def _primary_symbol(code):
+    if code == "USD":
+        return "$"
+    if code == "PHP":
+        return "P"
+    return ""
 
+def _fmt_price(usd):
+    factor = float(getattr(info_center, "usd_to_primary", 0.0) or 0.0)
+    return usd * factor
+    
 def build_oil_message_and_colors():
     def add(text, color, msg, colors):
         for ch in text:
@@ -59,28 +65,26 @@ def build_oil_message_and_colors():
         return False
 
     def add_price(usd_value, msg, colors):
-        usd_str, php_str = _fmt_price(usd_value)
-
-        # $xx.xx
-        add("$", COLOR_WHITE, msg, colors)
-        int_part, frac = usd_str.split('.')
-        add(int_part, COLOR_CYAN, msg, colors)
+        primary = getattr(info_center, "exchange_primary", "USD")
+        ok = bool(getattr(info_center, "primary_valid", True))
+        val = _fmt_price(usd_value)
+        body = f"{val:.2f}" if (ok and val > 0.0) else "--.--"
+        int_part, frac = body.split(".")
+        sym = _primary_symbol(primary)
+        code_color = COLOR_WHITE if ok else COLOR_RED
+        num_color  = COLOR_CYAN if (ok and val > 0.0) else COLOR_RED
+        if sym:
+            add(sym, code_color, msg, colors)
+        else:
+            add(primary, code_color, msg, colors)
+        add(int_part, num_color, msg, colors)
         add(".", COLOR_WHITE, msg, colors)
-        add(frac, COLOR_CYAN, msg, colors)
-
-        add("/", COLOR_WHITE, msg, colors)
-
-        # Pxx.xx
-        add("P", COLOR_WHITE, msg, colors)
-        int_part, frac = php_str.split('.')
-        add(int_part, COLOR_CYAN, msg, colors)
-        add(".", COLOR_WHITE, msg, colors)
-        add(frac, COLOR_CYAN, msg, colors)
-
+        add(frac, num_color, msg, colors)
+        
     msg = []
     colors = []
 
-    add("CRUDE OIL: ", COLOR_WHITE, msg, colors)
+    add("CRUDE OIL:", COLOR_WHITE, msg, colors)
 
     # WTI
     add("WTI", COLOR_WHITE, msg, colors)
@@ -88,7 +92,7 @@ def build_oil_message_and_colors():
     if not had_arrow:
         add(" ", COLOR_WHITE, msg, colors)
     add_price(info_center.oil_wti, msg, colors)
-    add(", ", COLOR_WHITE, msg, colors)
+    add(",", COLOR_WHITE, msg, colors)
 
     # BRENT
     add("BRENT", COLOR_WHITE, msg, colors)
@@ -96,7 +100,7 @@ def build_oil_message_and_colors():
     if not had_arrow:
         add(" ", COLOR_WHITE, msg, colors)
     add_price(info_center.oil_brent, msg, colors)
-    add(", ", COLOR_WHITE, msg, colors)
+    add(",", COLOR_WHITE, msg, colors)
 
     # URALS
     add("URALS", COLOR_WHITE, msg, colors)
@@ -117,13 +121,8 @@ def display_oil():
     oil_tick    = info_center.oil_last_update > oil.last_built
     fx_tick     = info_center.exchange_last_update > oil.last_built
 
-    need_rebuild = (
-        first_paint or
-        oil_tick or
-        fx_tick or
-        not fresh
-    )
-
+    need_rebuild = first_paint or oil_tick or fx_tick
+    
     if need_rebuild:
         info_center.pattern_init = True
         clear_lower_panel()

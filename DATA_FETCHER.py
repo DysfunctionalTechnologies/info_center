@@ -200,58 +200,74 @@ def _norm_ccy(raw, fallback):
     s = "".join(ch for ch in str(raw).upper() if "A" <= ch <= "Z")
     return s[:3] if len(s) == 3 else fallback
 
-def fetch_exchange():
-    base  = _norm_ccy(getattr(info_center, "exchange_base", "USD"), "USD")
-    quote = _norm_ccy(getattr(info_center, "exchange_quote", "PHP"), "PHP")
-    if base == quote:
-        logger.warning("Exchange pair ignored – base equals quote")
-        return False
+def _usd_rate(rates, code):
+    if code == "USD":
+        return 1.0, True
+    try:
+        val = float(rates[code])
+        return val, val > 0.0
+    except (KeyError, TypeError, ValueError):
+        return 0.0, False
 
-    data = _safe_get("https://open.er-api.com/v6/latest/%s" % base)
+def fetch_exchange():
+    primary   = _norm_ccy(getattr(info_center, "exchange_primary",
+                 getattr(info_center, "exchange_base", "USD")), "USD")
+    secondary = _norm_ccy(getattr(info_center, "exchange_secondary",
+                 getattr(info_center, "exchange_quote", "PHP")), "PHP")
+
+    data = _safe_get("https://open.er-api.com/v6/latest/USD")
     if not data:
         return False
 
     try:
         rates = data.get("rates") or {}
-        if quote not in rates:
-            logger.warning("Exchange quote %s missing for base %s", quote, base)
-            return False
-        new_rate = float(rates[quote])
-        if new_rate <= 0.0:
-            return False
+        usd_p, ok_p = _usd_rate(rates, primary)
+        usd_s, ok_s = _usd_rate(rates, secondary)
+        pair = (usd_s / usd_p) if (ok_p and ok_s and usd_p > 0.0) else 0.0
 
         with info_center.lock:
-            info_center.exchange_base = base
-            info_center.exchange_quote = quote
-            old_rate = info_center.exchange_rate
-            had_prior = (old_rate > 0.0 and
-                         info_center.exchange_last_update > 0.0)
-            baseline = old_rate if had_prior else info_center.last_exchange_rate
+            old_pair = getattr(info_center, "pair_rate", 0.0) or info_center.exchange_rate
+            had_prior = (old_pair > 0.0 and info_center.exchange_last_update > 0.0)
+            baseline = old_pair if had_prior else info_center.last_exchange_rate
 
             if had_prior:
-                info_center.last_exchange_rate = old_rate
-            elif info_center.last_exchange_rate <= 0.0:
-                info_center.last_exchange_rate = new_rate
+                info_center.last_exchange_rate = old_pair
+            elif info_center.last_exchange_rate <= 0.0 and pair > 0.0:
+                info_center.last_exchange_rate = pair
 
-            info_center.exchange_rate = new_rate
+            info_center.exchange_primary   = primary
+            info_center.exchange_secondary = secondary
+            info_center.exchange_base      = primary
+            info_center.exchange_quote     = secondary
+            info_center.usd_to_primary     = usd_p
+            info_center.usd_to_secondary   = usd_s
+            info_center.pair_rate          = pair
+            info_center.primary_valid      = ok_p
+            info_center.secondary_valid    = ok_s
+            info_center.exchange_rate      = pair
             info_center.exchange_last_update = time.monotonic()
             info_center.exchange.last_built = 0.0
+            info_center.oil.last_built = 0.0
 
-        if baseline > 0.0:
-            delta_pct = abs(new_rate - baseline) / baseline
+        if baseline > 0.0 and pair > 0.0:
+            delta_pct = abs(pair - baseline) / baseline
             if delta_pct >= EXCHANGE_ALERT_MAJOR_PCT:
                 raise_alert(2, "fx-major pct=%.4f" % delta_pct)
             elif delta_pct >= EXCHANGE_ALERT_MINOR_PCT:
                 raise_alert(1, "fx-minor pct=%.4f" % delta_pct)
 
-        # not save_persisted() for the new pair yet
-        save_persisted()
+        if not ok_p:
+            logger.warning("FX primary code invalid: %s", primary)
+        if not ok_s:
+            logger.warning("FX secondary code invalid: %s", secondary)
+
+        save_persisted()   # still only last_exchange_rate / oil prev
         return True
 
     except Exception as e:
         logger.warning("Exchange parse error: %s", e)
         return False
-        
+                
 def fetch_oil():
     global _oil_asof
 

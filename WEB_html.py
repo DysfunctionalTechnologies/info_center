@@ -45,21 +45,24 @@ HTML = """
     <button id="tempUnitBtn" class="debug-off" onclick="toggleTempUnit()">TEMP: --</button>
     <button id="globePushBtn" class="debug-off" onclick="toggleGlobePush()">PUSH GLOBE: OFF</button>
 
-    <div class="grid-2x3">
-        <label>1
-            <input id="fxBase" maxlength="3" size="3" style="text-transform:uppercase">
-        </label>
-        <label>=
-            <input id="fxQuote" maxlength="3" size="3" style="text-transform:uppercase">
-        </label>
-    </div>
-    <button class="pattern" onclick="setFxPair()">SET FX PAIR</button>
-
-    {% if role == "tech" %}
+    <label>PRIMARY</label>
+    <input id="fxPrimary" maxlength="3" autocomplete="off"
+           style="text-transform:uppercase;width:4em">
     <br>
+    <button class="pattern" onclick="setFxPrimary()">SET PRIMARY CURRENCY</button>
+
+    <label>SECONDARY</label>
+    <input id="fxSecondary" maxlength="3" autocomplete="off"
+           style="text-transform:uppercase;width:4em">
+    <br>
+    <button class="pattern" onclick="setFxSecondary()">SET SECONDARY CURRENCY</button>
+    <div class="note">for exchange rate only</div>
+
+    <br>
+    {% if role == "tech" %}
     <button class="nav-btn" onclick="window.location='/diag'">TECH</button>
     {% endif %}
-
+        
     <br>
     <button class="logout" onclick="logout()">Logout</button>
 
@@ -77,15 +80,31 @@ HTML = """
         const militaryBtn = document.getElementById("militaryBtn");
         const tempUnitBtn = document.getElementById("tempUnitBtn");
         const globePushBtn = document.getElementById("globePushBtn");
+        const fxPrimary = document.getElementById("fxPrimary");
+        const fxSecondary = document.getElementById("fxSecondary");
 
         function toggleGlobePush() {
             call('/set_globe_push?value=' + (window._globePush ? 0 : 1));
         }
-        function setFxPair() {
-            const b = (document.getElementById("fxBase").value || "USD").toUpperCase();
-            const q = (document.getElementById("fxQuote").value || "PHP").toUpperCase();
-            call('/set_exchange_pair?base=' + encodeURIComponent(b) +
-                 '&quote=' + encodeURIComponent(q));
+        function normCcy(raw, fallback) {
+            const s = String(raw || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
+            return s || fallback;
+        }
+        function setFxPrimary() {
+            const p = normCcy(fxPrimary && fxPrimary.value, "USD");
+            if (fxPrimary) { fxPrimary.value = p; fxPrimary.style.color = ""; }
+            call('/set_exchange_pair?primary=' + encodeURIComponent(p));
+        }
+        function setFxSecondary() {
+            const s = normCcy(fxSecondary && fxSecondary.value, "PHP");
+            if (fxSecondary) { fxSecondary.value = s; fxSecondary.style.color = ""; }
+            call('/set_exchange_pair?secondary=' + encodeURIComponent(s));
+        }
+        if (fxPrimary) {
+            fxPrimary.addEventListener("input", () => { fxPrimary.style.color = ""; });
+        }
+        if (fxSecondary) {
+            fxSecondary.addEventListener("input", () => { fxSecondary.style.color = ""; });
         }
         slider.addEventListener("mousedown",  () => sliding = true);
         slider.addEventListener("touchstart", () => sliding = true);
@@ -163,12 +182,14 @@ HTML = """
                 tempUnitBtn.textContent = "TEMP: " + (window._tempC ? "C" : "F");
                 tempUnitBtn.className = window._tempC ? "debug-on" : "debug-off";
             }
-            const fxB = document.getElementById("fxBase");
-            const fxQ = document.getElementById("fxQuote");
-            if (fxB && document.activeElement !== fxB)
-                fxB.value = data.exchange_base || "USD";
-            if (fxQ && document.activeElement !== fxQ)
-                fxQ.value = data.exchange_quote || "PHP";
+            if (fxPrimary && document.activeElement !== fxPrimary) {
+                fxPrimary.value = data.exchange_primary || data.exchange_base || "USD";
+                fxPrimary.style.color = (data.primary_valid === false) ? "#f00" : "#0c0";
+            }
+            if (fxSecondary && document.activeElement !== fxSecondary) {
+                fxSecondary.value = data.exchange_secondary || data.exchange_quote || "PHP";
+                fxSecondary.style.color = (data.secondary_valid === false) ? "#f00" : "#0c0";
+            }
             if (!sliding) slider.value = data.brightness;
         }
         setInterval(() => call("/status", "GET"), 2000);
