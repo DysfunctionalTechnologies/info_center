@@ -72,7 +72,8 @@ def push_globe(force=False, mode=None):
         "boot": _BOOT_ID,
     }).encode("ascii")
     try:
-        _sock.sendto(payload, (globe_host(), GLOBE_PORT))
+        dest = globe_host() or GLOBE_HOST
+        _sock.sendto(payload, (dest, GLOBE_PORT))
         _last_mode = mode
         _last_send = now
     except OSError as e:

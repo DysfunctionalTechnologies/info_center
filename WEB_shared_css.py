@@ -57,6 +57,7 @@ SHARED_CSS = """
     .logout    { background: #444; margin-top: 28px; }
     label { display: block; margin-top: 16px; margin-bottom: 4px; }
     .note { color: #f80; margin-top: 8px; min-height: 1.2em; font-size: 0.95em; }
+    .note:empty { display: none; margin: 0; }
     .section {
         margin-top: 22px;
         margin-bottom: 8px;

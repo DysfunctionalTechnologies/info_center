@@ -241,6 +241,34 @@ PATTERN_HANDLERS = [
 
 LOOP_START = 6
 
+PATTERN_ALWAYS_ON = {6}   # internet monitor only
+PATTERN_ENABLE_ATTR = {
+    7:  "show_pacman",
+    8:  "show_weather",
+    9:  "show_exchange",
+    10: "show_oil",
+    11: "show_earthquake",
+}
+
+def pattern_allowed(num):
+    if num < LOOP_START:
+        return True
+    if num in PATTERN_ALWAYS_ON:
+        return True
+    attr = PATTERN_ENABLE_ATTR.get(num)
+    if attr is None:
+        return True
+    return bool(getattr(info_center, attr, True))
+
+def next_loop_pattern(current):
+    cycle_len = len(PATTERN_HANDLERS) - LOOP_START
+    nxt = current
+    for _ in range(max(1, cycle_len)):
+        nxt = LOOP_START + ((nxt - LOOP_START + 1) % cycle_len)
+        if pattern_allowed(nxt):
+            return nxt
+    return LOOP_START
+    
 def main():
     if info_center.debug_mode:
         logger.info(f"\n{info_center.program_name_1_string} {info_center.program_name_2_string} Program Started (Version {info_center.version_string})")
@@ -299,17 +327,23 @@ def main():
             info_center.current_dow  = time.strftime("%a", time.localtime()).upper()
 
             # ----- Advance pattern -----
-            if now >= info_center.pattern_end_time:
-                if info_center.current_pattern >= LOOP_START:
-                    cycle_len = len(PATTERN_HANDLERS) - LOOP_START
-                    offset = (info_center.current_pattern - LOOP_START + 1) % cycle_len
-                    info_center.current_pattern = LOOP_START + offset
-                else:
-                    info_center.current_pattern += 1
-
+            # Drop a disabled pattern immediately (scrolls keep extending end_time)
+            if (info_center.current_pattern >= LOOP_START and
+                    not pattern_allowed(info_center.current_pattern)):
+                info_center.current_pattern = next_loop_pattern(
+                    info_center.current_pattern)
                 info_center.pattern_init = False
                 info_center.pattern_end_time = now + 0.05
 
+            elif now >= info_center.pattern_end_time:
+                if info_center.current_pattern >= LOOP_START:
+                    info_center.current_pattern = next_loop_pattern(
+                        info_center.current_pattern)
+                else:
+                    info_center.current_pattern += 1
+                info_center.pattern_init = False
+                info_center.pattern_end_time = now + 0.05
+                                
             # ----- Dispatch -----
             if 1 <= info_center.current_pattern < len(PATTERN_HANDLERS):
                 PATTERN_HANDLERS[info_center.current_pattern]()

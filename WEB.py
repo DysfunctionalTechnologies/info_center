@@ -112,6 +112,58 @@ class RingLogHandler(logging.Handler):
         with _log_ring_lock:
             LOG_RING.append(line)
 
+def _apply_platform_cfg(cfg):
+    info_center.panel_layout = cfg["PANEL_LAYOUT"]
+    try:
+        info_center.strip_gpio = int(cfg["GPIO_PIN"])
+    except (TypeError, ValueError):
+        pass
+    enabled = cfg["GLOBE_PUSH"] == "1"
+    info_center.globe_push_enabled = enabled
+    save_persisted()
+    from GLOBE_LINK import push_globe
+    if enabled:
+        push_globe(force=True)
+    else:
+        push_globe(force=True, mode="OFF")
+    logger.info("Platform saved %s gpio=%s globe=%s host=%s",
+                cfg["PANEL_LAYOUT"], cfg["GPIO_PIN"],
+                cfg["GLOBE_PUSH"], cfg.get("GLOBE_HOST", ""))
+
+@app.route("/platform_save", methods=["POST"])
+def route_platform_save():
+    if not is_tech():
+        return redirect("/")
+    cfg = save_platform(_platform_fields_from_request())
+    _apply_platform_cfg(cfg)
+    return redirect("/diag")
+
+@app.route("/platform_save_reboot", methods=["POST"])
+def route_platform_save_reboot():
+    if not is_tech():
+        return redirect("/")
+    if request.form.get("confirm") != "REBOOT":
+        return redirect("/diag")
+    cfg = save_platform(_platform_fields_from_request())
+    _apply_platform_cfg(cfg)
+    logger.info("Platform saved – rebooting")
+    threading.Thread(
+        target=lambda: (time.sleep(0.4), os.system("sudo /sbin/reboot")),
+        name="PlatformReboot",
+        daemon=True
+    ).start()
+    return "Rebooting...", 200
+    
+def _platform_fields_from_request():
+    return {
+        "PANEL_LAYOUT": request.form.get("PANEL_LAYOUT", "16x16"),
+        "GPIO_PIN": request.form.get("GPIO_PIN", "21"),
+        "GLOBE_PUSH": "1" if request.form.get("GLOBE_PUSH") else "0",
+        "GLOBE_HOST": request.form.get("GLOBE_HOST", "192.168.0.223"),
+        "DIAG_BRIGHTNESS": request.form.get("DIAG_BRIGHTNESS", ""),
+        "DISPLAY_NAME": request.form.get("DISPLAY_NAME", ""),
+    }
+
 def attach_log_handler():
     global _web_log_handler, _web_logs_enabled
     root = logging.getLogger()
@@ -483,8 +535,13 @@ def status():
                               getattr(info_center, "exchange_quote", "PHP")),
         "pair_rate":          float(getattr(info_center, "pair_rate", 0.0) or 0.0),
         "usd_to_primary":     float(getattr(info_center, "usd_to_primary", 0.0) or 0.0),
-        "primary_valid":      bool(getattr(info_center, "primary_valid", True)),
-        "secondary_valid":    bool(getattr(info_center, "secondary_valid", True)),
+        "primary_valid":      bool(getattr(info_center,  "primary_valid", True)),
+        "secondary_valid":    bool(getattr(info_center,  "secondary_valid", True)),
+        "show_pacman":        bool(getattr(info_center,  "show_pacman", True)),
+        "show_weather":       bool(getattr(info_center,  "show_weather", True)),
+        "show_exchange":      bool(getattr(info_center,  "show_exchange", True)),
+        "show_oil":           bool(getattr(info_center,  "show_oil", True)),        
+        "show_earthquake":    bool(getattr(info_center,  "show_earthquake", True)),
     })
 
 @app.route("/set_globe_push", methods=["POST"])
@@ -538,6 +595,28 @@ def route_set_exchange_pair():
     threading.Thread(target=fetch_exchange, name="FXPairFetch", daemon=True).start()
     return status()
     
+_PATTERN_ENABLE_KEYS = {
+    "pacman":     "show_pacman",
+    "weather":    "show_weather",
+    "exchange":   "show_exchange",
+    "oil":        "show_oil",
+    "earthquake": "show_earthquake",
+}
+
+@app.route("/set_pattern_enable", methods=["POST"])
+def route_set_pattern_enable():
+    if not is_authenticated():
+        return _deny_json()
+    name = str(request.args.get("name", "")).strip().lower()
+    attr = _PATTERN_ENABLE_KEYS.get(name)
+    if not attr:
+        return status()
+    raw = str(request.args.get("value", "1")).lower()
+    enabled = raw in ("1", "true", "yes", "on")
+    setattr(info_center, attr, enabled)
+    logger.info("Pattern %s → %s (RAM only)", attr, enabled)
+    return status()
+
 @app.route("/set_debug", methods=["POST"])
 def route_set_debug():
     if not is_tech():

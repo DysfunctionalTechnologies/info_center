@@ -57,12 +57,21 @@ HTML = """
     <br>
     <button class="pattern" onclick="setFxSecondary()">SET SECONDARY CURRENCY</button>
     <div class="note">for exchange rate only</div>
+    <br>
+
+    <div class="note">Lower patterns</div>
+    <div class="note">INTERNET MONITOR always on</div>
+    <button id="patPacmanBtn" class="debug-on" onclick="togglePat('pacman')">PACMAN: ON</button>
+    <button id="patWeatherBtn" class="debug-on" onclick="togglePat('weather')">WEATHER: ON</button>
+    <button id="patExchangeBtn" class="debug-on" onclick="togglePat('exchange')">EXCHANGE: ON</button>
+    <button id="patOilBtn" class="debug-on" onclick="togglePat('oil')">OIL: ON</button>    
+    <button id="patQuakeBtn" class="debug-on" onclick="togglePat('earthquake')">EARTHQUAKE: ON</button>
 
     <br>
     {% if role == "tech" %}
     <button class="nav-btn" onclick="window.location='/diag'">TECH</button>
     {% endif %}
-        
+
     <br>
     <button class="logout" onclick="logout()">Logout</button>
 
@@ -72,6 +81,11 @@ HTML = """
         window._military = false;
         window._tempC = true;
         window._globePush = false;
+        window._showPacman = true;
+        window._showWeather = true;
+        window._showExchange = true;
+        window._showOil = true;
+        window._showQuake = true;
         const slider = document.getElementById("bright");
         const autoBtn = document.getElementById("autoBtn");
         const autoNote = document.getElementById("autoNote");
@@ -99,6 +113,21 @@ HTML = """
             const s = normCcy(fxSecondary && fxSecondary.value, "PHP");
             if (fxSecondary) { fxSecondary.value = s; fxSecondary.style.color = ""; }
             call('/set_exchange_pair?secondary=' + encodeURIComponent(s));
+        }
+        function togglePat(name) {
+            const on = {
+                pacman: window._showPacman,
+                weather: window._showWeather,
+                exchange: window._showExchange,
+                oil: window._showOil,
+                earthquake: window._showQuake
+            }[name];
+            call('/set_pattern_enable?name=' + name + '&value=' + (on ? 0 : 1));
+        }
+        function paintPat(btn, on, label) {
+            if (!btn) return;
+            btn.textContent = label + ": " + (on ? "ON" : "OFF");
+            btn.className = on ? "debug-on" : "debug-off";
         }
         if (fxPrimary) {
             fxPrimary.addEventListener("input", () => { fxPrimary.style.color = ""; });
@@ -161,18 +190,15 @@ HTML = """
                 globePushBtn.textContent = "PUSH GLOBE: " + (data.globe_push ? "ON" : "OFF");
                 globePushBtn.className = data.globe_push ? "debug-on" : "debug-off";
             }
-            if (autoBtn) {
-                autoBtn.textContent = "AUTO BRIGHT: " + (data.auto_brightness ? "YES" : "NO");
-                autoBtn.className = data.auto_brightness ? "auto-on" : "auto-off";
-            }
-            if (autoNote) {
-                autoNote.textContent = data.auto_brightness ? "" : "Manual brightness – auto disabled";
-            }
             if (setDayBtn) {
                 setDayBtn.innerHTML = "SET DAY<br>" + data.day_brightness;
             }
             if (setNightBtn) {
                 setNightBtn.innerHTML = "SET NIGHT<br>" + data.night_brightness;
+            }
+            if (autoBtn) {
+                autoBtn.textContent = (data.auto_brightness ? "AUTOMATIC" : "MANUAL") + " BRIGHTNESS";
+                autoBtn.className = data.auto_brightness ? "auto-on" : "auto-off";
             }
             if (militaryBtn) {
                 militaryBtn.textContent = "MILITARY TIME: " + (data.military_time ? "ON" : "OFF");
@@ -190,6 +216,16 @@ HTML = """
                 fxSecondary.value = data.exchange_secondary || data.exchange_quote || "PHP";
                 fxSecondary.style.color = (data.secondary_valid === false) ? "#f00" : "#0c0";
             }
+            window._showPacman   = data.show_pacman !== false;
+            window._showWeather  = data.show_weather !== false;
+            window._showExchange = data.show_exchange !== false;
+            window._showOil      = data.show_oil != false;
+            window._showQuake    = data.show_earthquake !== false;
+            paintPat(document.getElementById("patPacmanBtn"),   window._showPacman,   "PACMAN");
+            paintPat(document.getElementById("patWeatherBtn"),  window._showWeather,  "WEATHER");
+            paintPat(document.getElementById("patExchangeBtn"), window._showExchange, "EXCHANGE");
+            paintPat(document.getElementById("patOilBtn"),      window._showOil,      "OIL");
+            paintPat(document.getElementById("patQuakeBtn"),    window._showQuake,    "EARTHQUAKE");
             if (!sliding) slider.value = data.brightness;
         }
         setInterval(() => call("/status", "GET"), 2000);

@@ -282,6 +282,12 @@ class InfoCenterState:
         self.internet                 = InternetMonitorState()
         self.fetcher                  = FetcherState()
         self.color                    = ColorPanelState()
+        
+        self.show_pacman              = True
+        self.show_weather             = True
+        self.show_exchange            = True
+        self.show_oil                 = True
+        self.show_earthquake          = True
 
         self.weather_lat              = 15.12736
         self.weather_lon              = 121.00056
