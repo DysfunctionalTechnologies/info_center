@@ -225,6 +225,11 @@ def fetch_exchange():
         usd_s, ok_s = _usd_rate(rates, secondary)
         pair = (usd_s / usd_p) if (ok_p and ok_s and usd_p > 0.0) else 0.0
 
+        primary = getattr(info_center, "exchange_primary",
+                          getattr(info_center, "exchange_base", "USD"))
+        secondary = getattr(info_center, "exchange_secondary",
+                            getattr(info_center, "exchange_quote", "PHP"))
+
         with info_center.lock:
             old_pair = getattr(info_center, "pair_rate", 0.0) or info_center.exchange_rate
             had_prior = (old_pair > 0.0 and info_center.exchange_last_update > 0.0)
@@ -234,6 +239,7 @@ def fetch_exchange():
                 info_center.last_exchange_rate = old_pair
             elif info_center.last_exchange_rate <= 0.0 and pair > 0.0:
                 info_center.last_exchange_rate = pair
+                baseline = 0.0
 
             info_center.exchange_primary   = primary
             info_center.exchange_secondary = secondary
@@ -252,18 +258,20 @@ def fetch_exchange():
         if baseline > 0.0 and pair > 0.0:
             delta_pct = abs(pair - baseline) / baseline
             if delta_pct >= EXCHANGE_ALERT_MAJOR_PCT:
-                raise_alert(2, "fx-major pct=%.4f" % delta_pct)
+                raise_alert(2, "fx-major %s/%s pct=%.4f" %
+                            (primary, secondary, delta_pct))
             elif delta_pct >= EXCHANGE_ALERT_MINOR_PCT:
-                raise_alert(1, "fx-minor pct=%.4f" % delta_pct)
+                raise_alert(1, "fx-minor %s/%s pct=%.4f" %
+                            (primary, secondary, delta_pct))
 
         if not ok_p:
             logger.warning("FX primary code invalid: %s", primary)
         if not ok_s:
             logger.warning("FX secondary code invalid: %s", secondary)
 
-        save_persisted()   # still only last_exchange_rate / oil prev
+        save_persisted()
         return True
-
+        
     except Exception as e:
         logger.warning("Exchange parse error: %s", e)
         return False
@@ -324,6 +332,63 @@ def fetch_oil():
     except Exception as e:
         logger.warning("Oil parse error: %s", e)
         return False
+
+def _norm_symbol(raw):
+    s = "".join(ch for ch in str(raw).upper() if ch.isalnum() or ch in ".-")
+    return s[:8]
+
+def _fetch_one_stock(sym):
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/%s?range=1d&interval=1d" % sym
+    data = _safe_get(url, timeout=10)
+    if not data:
+        return 0.0, 0.0, False
+    try:
+        meta = data["chart"]["result"][0]["meta"]
+        price = float(meta.get("regularMarketPrice") or 0.0)
+        prev  = float(meta.get("chartPreviousClose") or
+                      meta.get("previousClose") or 0.0)
+        return price, prev, price > 0.0
+    except (KeyError, TypeError, ValueError, IndexError):
+        return 0.0, 0.0, False
+
+def fetch_stocks():
+    symbols = list(getattr(info_center, "stock_symbols", ["", "", "", "", ""]))
+    while len(symbols) < 5:
+        symbols.append("")
+    symbols = [_norm_symbol(s) for s in symbols[:5]]
+
+    if not any(symbols):
+        with info_center.lock:
+            info_center.stock_prices = [0.0] * 5
+            info_center.stock_prevs  = [0.0] * 5
+            info_center.stock_valid  = [False] * 5
+            info_center.stock_last_update = time.monotonic()
+            info_center.stocks.last_built = 0.0
+        return True
+
+    prices, prevs, flags = [], [], []
+    any_ok = False
+    for sym in symbols:
+        if not sym:
+            prices.append(0.0); prevs.append(0.0); flags.append(False)
+            continue
+        price, prev, ok = _fetch_one_stock(sym)
+        prices.append(price)
+        prevs.append(prev)
+        flags.append(ok)
+        any_ok = any_ok or ok
+        if not ok:
+            logger.warning("Stock %s missing or invalid", sym)
+
+    with info_center.lock:
+        info_center.stock_symbols = symbols
+        info_center.stock_prices  = prices
+        info_center.stock_prevs   = prevs
+        info_center.stock_valid   = flags
+        info_center.stock_last_update = time.monotonic()
+        info_center.stocks.last_built = 0.0
+
+    return True if any_ok or not any(symbols) else False
 
 def _easter(year):
     a = year % 19
@@ -460,12 +525,14 @@ def _fetcher_loop():
     quake_ok     = False
     exchange_ok  = False
     oil_ok       = False
+    stock_ok     = False
     holiday_ok   = False
 
     weather_retry  = _FetchRetry("Weather")
     quake_retry    = _FetchRetry("Earthquake")
     exchange_retry = _FetchRetry("Exchange")
     oil_retry      = _FetchRetry("Oil")
+    stock_retry    = _FetchRetry("Stocks")
     holiday_retry  = _FetchRetry("Holiday")
 
     while True:
@@ -521,6 +588,17 @@ def _fetcher_loop():
                 else:
                     oil_ok = False
                     oil_retry.failure()
+
+            if stock_retry.allow(now) and (
+                    not stock_ok or
+                    (now - info_center.stock_last_update) >=
+                    info_center.stock_update_interval):
+                if fetch_stocks():
+                    stock_ok = True
+                    stock_retry.success()
+                else:
+                    stock_ok = False
+                    stock_retry.failure()
 
             if holiday_retry.allow(now) and (
                     not holiday_ok or

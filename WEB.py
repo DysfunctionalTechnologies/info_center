@@ -37,6 +37,7 @@ from   DATA_FETCHER   import fetch_weather
 from   DATA_FETCHER   import fetch_earthquake
 from   DATA_FETCHER   import fetch_exchange
 from   DATA_FETCHER   import fetch_oil
+from   DATA_FETCHER   import fetch_stocks
 from   DATA_FETCHER   import fetch_holidays
 from   DATA_FETCHER   import raise_alert
 from   EEPROM         import save_persisted
@@ -44,6 +45,7 @@ from   PANEL          import power_on
 from   PANEL          import power_off
 from   PANEL          import mark_dirty
 from   PLATFORM       import load_platform
+from   PLATFORM       import save_platform
 from   PLATFORM       import PLATFORM_PATH
 from   WEB_login      import HTML_LOGIN
 from   WEB_html       import HTML
@@ -111,58 +113,6 @@ class RingLogHandler(logging.Handler):
             line = record.getMessage()
         with _log_ring_lock:
             LOG_RING.append(line)
-
-def _apply_platform_cfg(cfg):
-    info_center.panel_layout = cfg["PANEL_LAYOUT"]
-    try:
-        info_center.strip_gpio = int(cfg["GPIO_PIN"])
-    except (TypeError, ValueError):
-        pass
-    enabled = cfg["GLOBE_PUSH"] == "1"
-    info_center.globe_push_enabled = enabled
-    save_persisted()
-    from GLOBE_LINK import push_globe
-    if enabled:
-        push_globe(force=True)
-    else:
-        push_globe(force=True, mode="OFF")
-    logger.info("Platform saved %s gpio=%s globe=%s host=%s",
-                cfg["PANEL_LAYOUT"], cfg["GPIO_PIN"],
-                cfg["GLOBE_PUSH"], cfg.get("GLOBE_HOST", ""))
-
-@app.route("/platform_save", methods=["POST"])
-def route_platform_save():
-    if not is_tech():
-        return redirect("/")
-    cfg = save_platform(_platform_fields_from_request())
-    _apply_platform_cfg(cfg)
-    return redirect("/diag")
-
-@app.route("/platform_save_reboot", methods=["POST"])
-def route_platform_save_reboot():
-    if not is_tech():
-        return redirect("/")
-    if request.form.get("confirm") != "REBOOT":
-        return redirect("/diag")
-    cfg = save_platform(_platform_fields_from_request())
-    _apply_platform_cfg(cfg)
-    logger.info("Platform saved – rebooting")
-    threading.Thread(
-        target=lambda: (time.sleep(0.4), os.system("sudo /sbin/reboot")),
-        name="PlatformReboot",
-        daemon=True
-    ).start()
-    return "Rebooting...", 200
-    
-def _platform_fields_from_request():
-    return {
-        "PANEL_LAYOUT": request.form.get("PANEL_LAYOUT", "16x16"),
-        "GPIO_PIN": request.form.get("GPIO_PIN", "21"),
-        "GLOBE_PUSH": "1" if request.form.get("GLOBE_PUSH") else "0",
-        "GLOBE_HOST": request.form.get("GLOBE_HOST", "192.168.0.223"),
-        "DIAG_BRIGHTNESS": request.form.get("DIAG_BRIGHTNESS", ""),
-        "DISPLAY_NAME": request.form.get("DISPLAY_NAME", ""),
-    }
 
 def attach_log_handler():
     global _web_log_handler, _web_logs_enabled
@@ -277,6 +227,12 @@ def _clamp_bright(raw):
     val = (val // 8) * 8
     return max(8, val)
 
+def _mark_brightness_dirty():
+    try:
+        mark_dirty()
+    except Exception:
+        pass
+
 def _apply_auto_target_if_needed():
     if not info_center.auto_brightness:
         return
@@ -309,6 +265,9 @@ def is_tech():
         return False
     return session.get("role") == "tech"
 
+def _deny_json():
+    return jsonify({"error": "unauthorized"}), 401
+
 def force_pattern(pattern_num):
     if pattern_num < 1:
         return
@@ -338,6 +297,7 @@ def _force_refresh_worker():
         fetch_earthquake()
         fetch_exchange()
         fetch_oil()
+        fetch_stocks()
         fetch_holidays()
         logger.info("Force refresh completed")
     except Exception:
@@ -363,14 +323,33 @@ def do_force_refresh():
     ).start()
     return True
 
-def _mark_brightness_dirty():
-    import PANEL
-    PANEL.brightness_dirty = True
-    PANEL.last_brightness_change = time.monotonic()
-    mark_dirty()
+def _platform_fields_from_request():
+    return {
+        "PANEL_LAYOUT": request.form.get("PANEL_LAYOUT", "16x16"),
+        "GPIO_PIN": request.form.get("GPIO_PIN", "21"),
+        "GLOBE_PUSH": "1" if request.form.get("GLOBE_PUSH") else "0",
+        "GLOBE_HOST": request.form.get("GLOBE_HOST", "192.168.0.223"),
+        "DIAG_BRIGHTNESS": request.form.get("DIAG_BRIGHTNESS", ""),
+        "DISPLAY_NAME": request.form.get("DISPLAY_NAME", ""),
+    }
 
-def _deny_json():
-    return jsonify({"error": "unauthorized"}), 401
+def _apply_platform_cfg(cfg):
+    info_center.panel_layout = cfg["PANEL_LAYOUT"]
+    try:
+        info_center.strip_gpio = int(cfg["GPIO_PIN"])
+    except (TypeError, ValueError):
+        pass
+    enabled = cfg["GLOBE_PUSH"] == "1"
+    info_center.globe_push_enabled = enabled
+    save_persisted()
+    from GLOBE_LINK import push_globe
+    if enabled:
+        push_globe(force=True)
+    else:
+        push_globe(force=True, mode="OFF")
+    logger.info("Platform saved %s gpio=%s globe=%s host=%s",
+                cfg["PANEL_LAYOUT"], cfg["GPIO_PIN"],
+                cfg["GLOBE_PUSH"], cfg.get("GLOBE_HOST", ""))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -444,7 +423,7 @@ def diag():
         plat_present=plat_present,
         plat_path=PLATFORM_PATH,
     )
-    
+
 @app.route("/logs")
 def logs_page():
     if not is_authenticated():
@@ -459,12 +438,7 @@ def logs_json():
         return _deny_json()
     with _log_ring_lock:
         lines = list(LOG_RING)
-    return jsonify({
-        "count": len(lines),
-        "lines": lines,
-        "debug_mode": bool(info_center.debug_mode),
-        "web_logs": _web_logs_enabled,
-    })
+    return jsonify({"lines": lines})
 
 @app.route("/status")
 def status():
@@ -501,6 +475,13 @@ def status():
         a_heavy   = _web_alert_heavy
         a_qy      = _web_alert_quake_y
         a_qr      = _web_alert_quake_r
+
+    symbols = list(getattr(info_center, "stock_symbols", ["", "", "", "", ""]))
+    while len(symbols) < 5:
+        symbols.append("")
+    valid = list(getattr(info_center, "stock_valid", [False] * 5))
+    while len(valid) < 5:
+        valid.append(False)
 
     return jsonify({
         "brightness": info_center.panel_brightness,
@@ -540,8 +521,11 @@ def status():
         "show_pacman":        bool(getattr(info_center,  "show_pacman", True)),
         "show_weather":       bool(getattr(info_center,  "show_weather", True)),
         "show_exchange":      bool(getattr(info_center,  "show_exchange", True)),
-        "show_oil":           bool(getattr(info_center,  "show_oil", True)),        
+        "show_oil":           bool(getattr(info_center,  "show_oil", True)),
+        "show_stocks":        bool(getattr(info_center,  "show_stocks", True)),
         "show_earthquake":    bool(getattr(info_center,  "show_earthquake", True)),
+        "stock_symbols":      symbols[:5],
+        "stock_valid":        valid[:5],
     })
 
 @app.route("/set_globe_push", methods=["POST"])
@@ -551,6 +535,10 @@ def route_set_globe_push():
     raw = str(request.args.get("value", "0")).lower()
     enabled = raw in ("1", "true", "yes", "on")
     info_center.globe_push_enabled = enabled
+    try:
+        save_platform({"GLOBE_PUSH": "1" if enabled else "0"})
+    except Exception:
+        logger.warning("platform GLOBE_PUSH save failed", exc_info=True)
     from GLOBE_LINK import push_globe
     if enabled:
         push_globe(force=True)
@@ -587,19 +575,24 @@ def route_set_exchange_pair():
         info_center.usd_to_secondary   = 0.0
         info_center.pair_rate          = 0.0
         info_center.exchange_rate      = 0.0
+        info_center.last_exchange_rate = 0.0
         info_center.primary_valid      = True
         info_center.secondary_valid    = True
         info_center.exchange.last_built = 0.0
         info_center.oil.last_built      = 0.0
-    logger.info("FX pair RAM → %s / %s (not persisted)", primary, secondary)
+        if hasattr(info_center, "stocks"):
+            info_center.stocks.last_built = 0.0
+    save_persisted()
+    logger.info("FX pair → %s / %s (EEPROM V3)", primary, secondary)
     threading.Thread(target=fetch_exchange, name="FXPairFetch", daemon=True).start()
     return status()
-    
+
 _PATTERN_ENABLE_KEYS = {
     "pacman":     "show_pacman",
     "weather":    "show_weather",
     "exchange":   "show_exchange",
     "oil":        "show_oil",
+    "stocks":     "show_stocks",
     "earthquake": "show_earthquake",
 }
 
@@ -614,7 +607,33 @@ def route_set_pattern_enable():
     raw = str(request.args.get("value", "1")).lower()
     enabled = raw in ("1", "true", "yes", "on")
     setattr(info_center, attr, enabled)
-    logger.info("Pattern %s → %s (RAM only)", attr, enabled)
+    save_persisted()
+    logger.info("Pattern %s → %s (EEPROM V3)", attr, enabled)
+    return status()
+
+@app.route("/set_stock_symbols", methods=["POST"])
+def route_set_stock_symbols():
+    if not is_authenticated():
+        return _deny_json()
+    raw = request.args.get("symbols", "")
+    parts = [p.strip().upper() for p in raw.replace(",", " ").split()]
+    out = []
+    for p in parts:
+        s = "".join(ch for ch in p if ch.isalnum() or ch in ".-")[:8]
+        if s and s not in out:
+            out.append(s)
+        if len(out) == 5:
+            break
+    while len(out) < 5:
+        out.append("")
+    with info_center.lock:
+        info_center.stock_symbols = out
+        info_center.stock_valid = [False] * 5
+        if hasattr(info_center, "stocks"):
+            info_center.stocks.last_built = 0.0
+    save_persisted()
+    logger.info("Stocks → %s (EEPROM V3)", out)
+    threading.Thread(target=fetch_stocks, name="StockFetch", daemon=True).start()
     return status()
 
 @app.route("/set_debug", methods=["POST"])
@@ -641,14 +660,39 @@ def route_set_brightness():
     if not is_authenticated():
         return _deny_json()
     try:
-        val = int(request.args.get("value", 128))
-        val = max(8, min(255, val))
-        if val != info_center.panel_brightness or info_center.auto_brightness:
-            info_center.panel_brightness = val
-            info_center.auto_brightness = False
-            _mark_brightness_dirty()
-    except Exception as e:
-        logger.warning("set_brightness failed: %s", e)
+        val = _clamp_bright(request.args.get("value", info_center.panel_brightness))
+    except (TypeError, ValueError):
+        return status()
+    info_center.panel_brightness = val
+    info_center.auto_brightness = False
+    _mark_brightness_dirty()
+    save_persisted()
+    return status()
+
+@app.route("/set_day_brightness", methods=["POST"])
+def route_set_day_brightness():
+    if not is_authenticated():
+        return _deny_json()
+    try:
+        val = _clamp_bright(request.args.get("value", info_center.day_brightness))
+    except (TypeError, ValueError):
+        return status()
+    info_center.day_brightness = val
+    _apply_auto_target_if_needed()
+    save_persisted()
+    return status()
+
+@app.route("/set_night_brightness", methods=["POST"])
+def route_set_night_brightness():
+    if not is_authenticated():
+        return _deny_json()
+    try:
+        val = _clamp_bright(request.args.get("value", info_center.night_brightness))
+    except (TypeError, ValueError):
+        return status()
+    info_center.night_brightness = val
+    _apply_auto_target_if_needed()
+    save_persisted()
     return status()
 
 @app.route("/set_auto_brightness", methods=["POST"])
@@ -657,8 +701,8 @@ def route_set_auto_brightness():
         return _deny_json()
     raw = str(request.args.get("value", "1")).lower()
     info_center.auto_brightness = raw in ("1", "true", "yes", "on")
-    _mark_brightness_dirty()
-    logger.info("Auto brightness → %s", info_center.auto_brightness)
+    _apply_auto_target_if_needed()
+    save_persisted()
     return status()
 
 @app.route("/set_military_time", methods=["POST"])
@@ -668,7 +712,6 @@ def route_set_military_time():
     raw = str(request.args.get("value", "1")).lower()
     info_center.military_time = raw in ("1", "true", "yes", "on")
     save_persisted()
-    logger.info("Military time → %s", info_center.military_time)
     return status()
 
 @app.route("/set_temp_celsius", methods=["POST"])
@@ -677,45 +720,15 @@ def route_set_temp_celsius():
         return _deny_json()
     raw = str(request.args.get("value", "1")).lower()
     info_center.temp_celsius = raw in ("1", "true", "yes", "on")
-    info_center.weather.last_built = 0.0
     save_persisted()
-    logger.info("Temp unit → %s", "C" if info_center.temp_celsius else "F")
-    return status()
-
-@app.route("/set_day_brightness", methods=["POST"])
-def route_set_day_brightness():
-    if not is_authenticated():
-        return _deny_json()
-    try:
-        info_center.day_brightness = _clamp_bright(
-            request.args.get("value", info_center.panel_brightness)
-        )
-        save_persisted()
-        _apply_auto_target_if_needed()
-        logger.info("Day brightness → %s", info_center.day_brightness)
-    except Exception as e:
-        logger.warning("set_day_brightness failed: %s", e)
-    return status()
-
-@app.route("/set_night_brightness", methods=["POST"])
-def route_set_night_brightness():
-    if not is_authenticated():
-        return _deny_json()
-    try:
-        info_center.night_brightness = _clamp_bright(
-            request.args.get("value", info_center.panel_brightness)
-        )
-        save_persisted()
-        _apply_auto_target_if_needed()
-        logger.info("Night brightness → %s", info_center.night_brightness)
-    except Exception as e:
-        logger.warning("set_night_brightness failed: %s", e)
     return status()
 
 @app.route("/power_on", methods=["POST"])
 def route_power_on():
     if not is_authenticated():
         return _deny_json()
+    info_center.power_level = POWER_ON
+    info_center.power_flag = True
     power_on()
     return status()
 
@@ -727,7 +740,7 @@ def route_power_off():
     return status()
 
 @app.route("/force/<int:pattern_num>", methods=["POST"])
-def route_force_pattern(pattern_num):
+def route_force(pattern_num):
     if not is_tech():
         return _deny_json()
     force_pattern(pattern_num)
@@ -775,9 +788,8 @@ def route_alert_reset():
     logger.info("Alerts reset via web")
     try:
         fetch_weather()
-        fetch_earthquake()
     except Exception:
-        logger.exception("Live refetch after alert reset failed")
+        pass
     return status()
 
 @app.route("/alert/thunder", methods=["POST"])
@@ -801,11 +813,11 @@ def route_alert_heavy():
         _web_alert_heavy = not _web_alert_heavy
         on = _web_alert_heavy
     _apply_web_alerts()
-    logger.info("Web heavy toggle → %s", on)
+    logger.info("Web heavy rain toggle → %s", on)
     return status()
 
 @app.route("/alert/quake_yellow", methods=["POST"])
-def route_alert_quake_yellow():
+def route_alert_quake_y():
     global _web_alert_quake_y
     if not is_tech():
         return _deny_json()
@@ -817,7 +829,7 @@ def route_alert_quake_yellow():
     return status()
 
 @app.route("/alert/quake_red", methods=["POST"])
-def route_alert_quake_red():
+def route_alert_quake_r():
     global _web_alert_quake_r
     if not is_tech():
         return _deny_json()
@@ -828,6 +840,30 @@ def route_alert_quake_red():
     logger.info("Web quake red toggle → %s", on)
     return status()
 
+@app.route("/platform_save", methods=["POST"])
+def route_platform_save():
+    if not is_tech():
+        return redirect("/")
+    cfg = save_platform(_platform_fields_from_request())
+    _apply_platform_cfg(cfg)
+    return redirect("/diag")
+
+@app.route("/platform_save_reboot", methods=["POST"])
+def route_platform_save_reboot():
+    if not is_tech():
+        return redirect("/")
+    if request.form.get("confirm") != "REBOOT":
+        return redirect("/diag")
+    cfg = save_platform(_platform_fields_from_request())
+    _apply_platform_cfg(cfg)
+    logger.info("Platform saved – rebooting")
+    threading.Thread(
+        target=lambda: (time.sleep(0.4), os.system("sudo /sbin/reboot")),
+        name="PlatformReboot",
+        daemon=True
+    ).start()
+    return "Rebooting...", 200
+
 _web_started = False
 
 def start_web():
@@ -837,10 +873,7 @@ def start_web():
         return
     _web_started = True
     apply_debug_mode(info_center.debug_mode)
-
-    host = "127.0.0.1"
-    if USERNAME and PASSWORD:
-        host = os.environ.get("INFOCENTER_WEB_BIND", "0.0.0.0")
+    host = "0.0.0.0"
 
     def run():
         app.run(host=host, port=5000, debug=False, use_reloader=False)

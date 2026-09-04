@@ -39,13 +39,14 @@ HTML_DIAG = """
     <div class="section">Force Pattern</div>
     <div class="grid-2x3">
         <button class="pattern" onclick="call('/force/6')">INTERNET<br>MONITOR</button>
-        <button class="pattern" onclick="call('/force/7')">PACMAN</button>
+        <button class="pattern" onclick="call('/force/7')">PAC-<br>MAN</button>
         <button class="pattern" onclick="call('/force/8')">WEATHER</button>
         <button class="pattern" onclick="call('/force/9')">EXCHANGE<br>RATE</button>
         <button class="pattern" onclick="call('/force/10')">CRUDE<br>OIL</button>
-        <button class="pattern" onclick="call('/force/11')">EARTHQUAKE</button>
+        <button class="pattern" onclick="call('/force/11')">STOCKS</button>
+        <button class="pattern" onclick="call('/force/12')">EARTH<br>QUAKE</button>
     </div>
-
+    
     <div class="section">Alert Testing</div>
     <button class="alert-btn" onclick="call('/alert/reset')">RESET<br>ALL ALERTS</button>
     <div class="grid-2x3">
@@ -56,7 +57,7 @@ HTML_DIAG = """
     </div>
 
     <div class="section">Platform (this Pi)</div>
-    <p class="muted">{{ plat_path }}<br>
+    <p class="muted" title="{{ plat_path }}">{{ plat_path.split('/')[-1] }}<br>
     {% if plat_present %}file present{% else %}missing — using defaults{% endif %}</p>
     <form method="post" action="/platform_save">
         <label>Name <input name="DISPLAY_NAME" value="{{ plat.DISPLAY_NAME }}"></label><br>

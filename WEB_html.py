@@ -33,8 +33,7 @@ HTML = """
     <label>Brightness</label>
     <input type="range" id="bright" min="8" max="255" step="8">
 
-    <button id="autoBtn" class="auto-off" onclick="toggleAuto()">AUTO BRIGHT: --</button>
-    <div class="note" id="autoNote"></div>
+    <button id="autoBtn" class="auto-off" onclick="toggleAuto()">MANUAL BRIGHTNESS</button>
 
     <div class="grid-2x3">
         <button id="setDayBtn" class="pattern" onclick="setDayBright()">SET DAY<br>--</button>
@@ -57,16 +56,23 @@ HTML = """
     <br>
     <button class="pattern" onclick="setFxSecondary()">SET SECONDARY CURRENCY</button>
     <div class="note">for exchange rate only</div>
-    <br>
 
     <div class="note">Lower patterns</div>
     <div class="note">INTERNET MONITOR always on</div>
     <button id="patPacmanBtn" class="debug-on" onclick="togglePat('pacman')">PACMAN: ON</button>
     <button id="patWeatherBtn" class="debug-on" onclick="togglePat('weather')">WEATHER: ON</button>
     <button id="patExchangeBtn" class="debug-on" onclick="togglePat('exchange')">EXCHANGE: ON</button>
-    <button id="patOilBtn" class="debug-on" onclick="togglePat('oil')">OIL: ON</button>    
+    <button id="patOilBtn" class="debug-on" onclick="togglePat('oil')">OIL: ON</button>
+    <button id="patStocksBtn" class="debug-on" onclick="togglePat('stocks')">STOCKS: ON</button>
     <button id="patQuakeBtn" class="debug-on" onclick="togglePat('earthquake')">EARTHQUAKE: ON</button>
 
+    <label>STOCKS</label>
+    <input id="stockBox" maxlength="40" autocomplete="off"
+           style="text-transform:uppercase;width:12em">
+    <br>
+    <button class="pattern" onclick="setStocks()">SET STOCKS</button>
+    <div class="note">up to 5 symbols — empty means none</div>
+    
     <br>
     {% if role == "tech" %}
     <button class="nav-btn" onclick="window.location='/diag'">TECH</button>
@@ -85,10 +91,10 @@ HTML = """
         window._showWeather = true;
         window._showExchange = true;
         window._showOil = true;
+        window._showStocks = true;
         window._showQuake = true;
         const slider = document.getElementById("bright");
         const autoBtn = document.getElementById("autoBtn");
-        const autoNote = document.getElementById("autoNote");
         const setDayBtn = document.getElementById("setDayBtn");
         const setNightBtn = document.getElementById("setNightBtn");
         const militaryBtn = document.getElementById("militaryBtn");
@@ -96,6 +102,7 @@ HTML = """
         const globePushBtn = document.getElementById("globePushBtn");
         const fxPrimary = document.getElementById("fxPrimary");
         const fxSecondary = document.getElementById("fxSecondary");
+        const stockBox = document.getElementById("stockBox");
 
         function toggleGlobePush() {
             call('/set_globe_push?value=' + (window._globePush ? 0 : 1));
@@ -114,12 +121,17 @@ HTML = """
             if (fxSecondary) { fxSecondary.value = s; fxSecondary.style.color = ""; }
             call('/set_exchange_pair?secondary=' + encodeURIComponent(s));
         }
+        function setStocks() {
+            const raw = stockBox ? stockBox.value : "";
+            call('/set_stock_symbols?symbols=' + encodeURIComponent(raw));
+        }
         function togglePat(name) {
             const on = {
                 pacman: window._showPacman,
                 weather: window._showWeather,
                 exchange: window._showExchange,
                 oil: window._showOil,
+                stocks: window._showStocks,
                 earthquake: window._showQuake
             }[name];
             call('/set_pattern_enable?name=' + name + '&value=' + (on ? 0 : 1));
@@ -190,15 +202,15 @@ HTML = """
                 globePushBtn.textContent = "PUSH GLOBE: " + (data.globe_push ? "ON" : "OFF");
                 globePushBtn.className = data.globe_push ? "debug-on" : "debug-off";
             }
+            if (autoBtn) {
+                autoBtn.textContent = (data.auto_brightness ? "AUTOMATIC" : "MANUAL") + " BRIGHTNESS";
+                autoBtn.className = data.auto_brightness ? "auto-on" : "auto-off";
+            }
             if (setDayBtn) {
                 setDayBtn.innerHTML = "SET DAY<br>" + data.day_brightness;
             }
             if (setNightBtn) {
                 setNightBtn.innerHTML = "SET NIGHT<br>" + data.night_brightness;
-            }
-            if (autoBtn) {
-                autoBtn.textContent = (data.auto_brightness ? "AUTOMATIC" : "MANUAL") + " BRIGHTNESS";
-                autoBtn.className = data.auto_brightness ? "auto-on" : "auto-off";
             }
             if (militaryBtn) {
                 militaryBtn.textContent = "MILITARY TIME: " + (data.military_time ? "ON" : "OFF");
@@ -219,13 +231,18 @@ HTML = """
             window._showPacman   = data.show_pacman !== false;
             window._showWeather  = data.show_weather !== false;
             window._showExchange = data.show_exchange !== false;
-            window._showOil      = data.show_oil != false;
+            window._showOil      = data.show_oil !== false;
+            window._showStocks   = data.show_stocks !== false;
             window._showQuake    = data.show_earthquake !== false;
             paintPat(document.getElementById("patPacmanBtn"),   window._showPacman,   "PACMAN");
             paintPat(document.getElementById("patWeatherBtn"),  window._showWeather,  "WEATHER");
             paintPat(document.getElementById("patExchangeBtn"), window._showExchange, "EXCHANGE");
             paintPat(document.getElementById("patOilBtn"),      window._showOil,      "OIL");
+            paintPat(document.getElementById("patStocksBtn"),   window._showStocks,   "STOCKS");
             paintPat(document.getElementById("patQuakeBtn"),    window._showQuake,    "EARTHQUAKE");
+            if (stockBox && document.activeElement !== stockBox && data.stock_symbols) {
+                stockBox.value = (data.stock_symbols || []).filter(Boolean).join(" ");
+            }
             if (!sliding) slider.value = data.brightness;
         }
         setInterval(() => call("/status", "GET"), 2000);

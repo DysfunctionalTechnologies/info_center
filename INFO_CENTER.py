@@ -58,6 +58,7 @@ from   PANEL          import clear_upper_panel
 from   PANEL          import clear_lower_panel
 from   PANEL          import clear_both_panels
 from   PANEL          import update_brightness
+from   STOCKS         import display_stocks
 from   WEATHER        import display_weather
 from   WEB            import start_web
 
@@ -223,6 +224,12 @@ def pattern_weather():
             logger.info(f"Pattern {info_center.current_pattern}: WEATHER")
     display_weather()
 
+def pattern_stocks():
+    if not info_center.pattern_init:
+        if info_center.debug_mode:
+            logger.info("Pattern %s: STOCKS", info_center.current_pattern)
+    display_stocks()
+
 # Pattern handlers
 PATTERN_HANDLERS = [
     None,                           #  0 – unused
@@ -236,7 +243,8 @@ PATTERN_HANDLERS = [
     pattern_weather,                #  8
     pattern_exchange,               #  9
     pattern_oil,                    # 10
-    pattern_earthquake,             # 11
+    pattern_stocks,                 # 11
+    pattern_earthquake,             # 12
 ]
 
 LOOP_START = 6
@@ -247,7 +255,8 @@ PATTERN_ENABLE_ATTR = {
     8:  "show_weather",
     9:  "show_exchange",
     10: "show_oil",
-    11: "show_earthquake",
+    11: "show_stocks",
+    12: "show_earthquake",
 }
 
 def pattern_allowed(num):

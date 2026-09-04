@@ -56,7 +56,7 @@ ALERT_DURATION                        = 300.0
 ALERT_FLASH_INTERVAL                  = 1.0
 ALERT_SOURCE_LIVE                     = "live"
 ALERT_SOURCE_WEB                      = "web_test"
-WEB_ALERT_HOLD                        = 600.0          # 10 min test hold, not 365 days
+WEB_ALERT_HOLD                        = 600.0
 # --- Brightness ---
 MIN_BRIGHTNESS                        = 0
 MAX_BRIGHTNESS                        = 255
@@ -68,13 +68,14 @@ WEATHER_UPDATE_INTERVAL               = 900.0
 QUAKE_UPDATE_INTERVAL                 = 300.0
 EXCHANGE_UPDATE_INTERVAL              = 900.0
 OIL_UPDATE_INTERVAL                   = 900.0
+STOCK_UPDATE_INTERVAL                 = 900.0
 HOLIDAY_CHECK_INTERVAL                = 3600.0
 # --- Earthquake thresholds ---
 QUAKE_MIN_MAGNITUDE                   = 5.0
 QUAKE_RADIUS_KM                       = 500
 QUAKE_ALERT_MAJOR                     = 6.0
 QUAKE_ALERT_MINOR                     = 5.0
-# --- Exchange rate alert thresholds (PHP) ---
+# --- Exchange rate alert thresholds ---
 EXCHANGE_ALERT_MAJOR                  = 0.50
 EXCHANGE_ALERT_MINOR                  = 0.25
 EXCHANGE_ALERT_MINOR_PCT              = 0.005
@@ -175,6 +176,12 @@ class OilDisplayState:
         self.msg                      = ""
         self.colors                   = []
 
+class StocksDisplayState:
+    def __init__(self):
+        self.last_built               = 0.0
+        self.msg                      = ""
+        self.colors                   = []
+
 class WeatherDisplayState:
     def __init__(self):
         self.last_built               = 0.0
@@ -191,7 +198,7 @@ class ExchangeDisplayState:
         self.last_built               = 0.0
         self.msg                      = ""
         self.colors                   = []
-        
+
 class InternetMonitorState:
     def __init__(self):
         self.step                     = 0
@@ -247,6 +254,13 @@ class InfoCenterState:
         self.night_brightness         = PANEL_NIGHTTIME_BRIGHTNESS
         self.globe_push_enabled       = False
 
+        self.show_pacman              = True
+        self.show_weather             = True
+        self.show_exchange            = True
+        self.show_oil                 = True
+        self.show_stocks              = True
+        self.show_earthquake          = True
+
         self.pattern_init             = False
         self.current_pattern          = 0
         self.pattern_end_time         = 0.0
@@ -277,17 +291,12 @@ class InfoCenterState:
         self.pacman                   = PacmanState()
         self.quake                    = QuakeDisplayState()
         self.oil                      = OilDisplayState()
+        self.stocks                   = StocksDisplayState()
         self.weather                  = WeatherDisplayState()
         self.exchange                 = ExchangeDisplayState()
         self.internet                 = InternetMonitorState()
         self.fetcher                  = FetcherState()
         self.color                    = ColorPanelState()
-        
-        self.show_pacman              = True
-        self.show_weather             = True
-        self.show_exchange            = True
-        self.show_oil                 = True
-        self.show_earthquake          = True
 
         self.weather_lat              = 15.12736
         self.weather_lon              = 121.00056
@@ -321,14 +330,14 @@ class InfoCenterState:
         self.last_exchange_rate       = 0.0
         self.exchange_primary         = "USD"
         self.exchange_secondary       = "PHP"
-        self.exchange_base            = "USD"   # alias of primary
-        self.exchange_quote           = "PHP"   # alias of secondary
+        self.exchange_base            = "USD"
+        self.exchange_quote           = "PHP"
         self.usd_to_primary           = 1.0
         self.usd_to_secondary         = 0.0
         self.pair_rate                = 0.0
         self.primary_valid            = True
         self.secondary_valid          = True
-                
+
         self.oil_wti                  = 0.0
         self.oil_brent                = 0.0
         self.oil_urals                = 0.0
@@ -337,6 +346,13 @@ class InfoCenterState:
         self.prev_wti                 = 0.0
         self.prev_brent               = 0.0
         self.prev_urals               = 0.0
+
+        self.stock_symbols            = ["", "", "", "", ""]
+        self.stock_prices             = [0.0, 0.0, 0.0, 0.0, 0.0]
+        self.stock_prevs              = [0.0, 0.0, 0.0, 0.0, 0.0]
+        self.stock_valid              = [False, False, False, False, False]
+        self.stock_last_update        = 0.0
+        self.stock_update_interval    = STOCK_UPDATE_INTERVAL
 
         self.alert_level              = 0
         self.alert_until              = 0.0
@@ -361,12 +377,27 @@ class InfoCenterState:
         self.prev_brent               = persisted["prev_brent"]
         self.prev_urals               = persisted["prev_urals"]
 
+        self.exchange_primary         = persisted.get("exchange_primary", "USD")
+        self.exchange_secondary       = persisted.get("exchange_secondary", "PHP")
+        self.exchange_base            = self.exchange_primary
+        self.exchange_quote           = self.exchange_secondary
+        self.show_pacman              = persisted.get("show_pacman", True)
+        self.show_weather             = persisted.get("show_weather", True)
+        self.show_exchange            = persisted.get("show_exchange", True)
+        self.show_oil                 = persisted.get("show_oil", True)
+        self.show_stocks              = persisted.get("show_stocks", True)
+        self.show_earthquake          = persisted.get("show_earthquake", True)
+        syms = list(persisted.get("stock_symbols", ["", "", "", "", ""]))
+        while len(syms) < 5:
+            syms.append("")
+        self.stock_symbols            = syms[:5]
+
         _plat, _plat_present          = load_platform()
         if _plat_present:
             self.globe_push_enabled   = _plat["GLOBE_PUSH"] == "1"
         else:
             self.globe_push_enabled   = persisted.get("globe_push_enabled", False)
-            
+
 info_center = InfoCenterState()
 
 HOURS_TENS, HOURS_ONES = 0, 1

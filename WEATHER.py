@@ -15,6 +15,8 @@ import time
 # Project Imports
 from   CONFIG       import info_center
 from   CONFIG       import LOWER_TEXT_ROW
+from   CONFIG       import WEATHER_HEAVY_CODES
+from   CONFIG       import WEATHER_THUNDER_CODES
 from   DATA_FETCHER import is_data_fresh
 from   FONT_3X6     import CHAR_DEGREE
 from   FONT_3X6     import CHAR_SUN_LEFT
@@ -85,13 +87,6 @@ def build_weather_message_and_colors():
         icon_left, icon_right = CHAR_MOON_LEFT, CHAR_MOON_RIGHT
         icon_color = COLOR_WHITE
 
-    if info_center.alert_level == 2:
-        alert_color = COLOR_RED
-    elif info_center.alert_level == 1:
-        alert_color = COLOR_YELLOW
-    else:
-        alert_color = None
-
     msg_chars = []
     colors    = []
 
@@ -140,8 +135,15 @@ def build_weather_message_and_colors():
 
     desc = WMO_CODES.get(info_center.weather_code, "UNKNOWN")
     info_center.weather_description = desc
-    add(desc, alert_color if alert_color else COLOR_CYAN, msg_chars, colors)
-            
+    code = info_center.weather_code
+    if code in WEATHER_HEAVY_CODES:
+        desc_color = COLOR_RED
+    elif code in WEATHER_THUNDER_CODES:
+        desc_color = COLOR_YELLOW
+    else:
+        desc_color = COLOR_CYAN
+    add(desc, desc_color, msg_chars, colors)
+                
     return "".join(msg_chars), colors
 
 def display_weather():
