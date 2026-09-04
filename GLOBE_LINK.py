@@ -16,13 +16,14 @@ import time
 import os
 
 # Project Imports
-from CONFIG import info_center
-from CONFIG import NETWORK_GOOD, NETWORK_PROBLEM, NETWORK_BAD
+from CONFIG   import info_center
+from CONFIG   import NETWORK_GOOD, NETWORK_PROBLEM, NETWORK_BAD
+from PLATFORM import globe_host
 
 logger = logging.getLogger(__name__)
 
-GLOBE_HOST = "192.168.0.223"
-GLOBE_PORT = 4210
+GLOBE_HOST  = globe_host()
+GLOBE_PORT  = 4210
 HEARTBEAT_S = 2.0
 
 _sock      = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -71,7 +72,7 @@ def push_globe(force=False, mode=None):
         "boot": _BOOT_ID,
     }).encode("ascii")
     try:
-        _sock.sendto(payload, (GLOBE_HOST, GLOBE_PORT))
+        _sock.sendto(payload, (globe_host(), GLOBE_PORT))
         _last_mode = mode
         _last_send = now
     except OSError as e:

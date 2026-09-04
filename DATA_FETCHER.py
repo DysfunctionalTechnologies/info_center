@@ -25,6 +25,8 @@ from   CONFIG       import QUAKE_ALERT_MAJOR
 from   CONFIG       import QUAKE_ALERT_MINOR
 from   CONFIG       import EXCHANGE_ALERT_MAJOR
 from   CONFIG       import EXCHANGE_ALERT_MINOR
+from   CONFIG       import EXCHANGE_ALERT_MAJOR_PCT
+from   CONFIG       import EXCHANGE_ALERT_MINOR_PCT
 from   EEPROM       import eeprom
 from   EEPROM       import save_persisted
 from   TEMPERATURE  import read_temp
@@ -194,14 +196,33 @@ def fetch_earthquake():
         logger.warning("Earthquake fetch error: %s", e)
         return False
 
+def _norm_ccy(raw, fallback):
+    s = "".join(ch for ch in str(raw).upper() if "A" <= ch <= "Z")
+    return s[:3] if len(s) == 3 else fallback
+
 def fetch_exchange():
-    data = _safe_get("https://open.er-api.com/v6/latest/USD")
+    base  = _norm_ccy(getattr(info_center, "exchange_base", "USD"), "USD")
+    quote = _norm_ccy(getattr(info_center, "exchange_quote", "PHP"), "PHP")
+    if base == quote:
+        logger.warning("Exchange pair ignored – base equals quote")
+        return False
+
+    data = _safe_get("https://open.er-api.com/v6/latest/%s" % base)
     if not data:
         return False
 
     try:
-        new_rate = float(data["rates"]["PHP"])
+        rates = data.get("rates") or {}
+        if quote not in rates:
+            logger.warning("Exchange quote %s missing for base %s", quote, base)
+            return False
+        new_rate = float(rates[quote])
+        if new_rate <= 0.0:
+            return False
+
         with info_center.lock:
+            info_center.exchange_base = base
+            info_center.exchange_quote = quote
             old_rate = info_center.exchange_rate
             had_prior = (old_rate > 0.0 and
                          info_center.exchange_last_update > 0.0)
@@ -214,21 +235,23 @@ def fetch_exchange():
 
             info_center.exchange_rate = new_rate
             info_center.exchange_last_update = time.monotonic()
+            info_center.exchange.last_built = 0.0
 
         if baseline > 0.0:
-            delta = abs(new_rate - baseline)
-            if delta >= EXCHANGE_ALERT_MAJOR:
-                raise_alert(2, f"fx-major delta={delta:.2f}")
-            elif delta >= EXCHANGE_ALERT_MINOR:
-                raise_alert(1, f"fx-minor delta={delta:.2f}")
+            delta_pct = abs(new_rate - baseline) / baseline
+            if delta_pct >= EXCHANGE_ALERT_MAJOR_PCT:
+                raise_alert(2, "fx-major pct=%.4f" % delta_pct)
+            elif delta_pct >= EXCHANGE_ALERT_MINOR_PCT:
+                raise_alert(1, "fx-minor pct=%.4f" % delta_pct)
 
+        # not save_persisted() for the new pair yet
         save_persisted()
         return True
 
     except Exception as e:
         logger.warning("Exchange parse error: %s", e)
         return False
-
+        
 def fetch_oil():
     global _oil_asof
 

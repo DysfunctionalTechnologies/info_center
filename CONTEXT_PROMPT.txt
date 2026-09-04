@@ -1,0 +1,38 @@
+Resume INFO_CENTER V1.19 with Grok.
+
+Fleet / portals
+- Preface 210: or 214:. Same portal until a new preface.
+- 210 = RPi5-1 192.168.0.210 workshop. GLOBE_PUSH=0.
+- 214 = RPi4B-1 192.168.0.214 test + wireless globe. GLOBE_PUSH=1.
+- Globe TFT is 192.168.0.223 UDP 4210. Not .230.
+- Six systems running. User manual parked. EEPROM version bump parked until all new settings exist.
+
+Done
+- Globe push persists: CONFIG already lets .platform win on boot; WEB /set_globe_push writes save_platform and save_persisted; GLOBE_LINK sendto uses globe_host().
+- WEATHER scroll label HUM: → RH:.
+
+In progress — FX / money model (do not invent Panel 1/Panel 2)
+- One PRIMARY per machine (Tim USD, wife PHP). SECONDARY is for the FX scroll only. WEB note: “for exchange rate only”.
+- FX scroll: 1USD = 62.64PHP  no space after numbers. Cyan: 1 and the rate. White: USD, =, PHP.
+- Oil and all other money: PRIMARY only. No $xx/Pxx dual prices.
+- Fetch once: open.er-api.com/v6/latest/USD then
+  usd_to_primary, usd_to_secondary, pair_rate = usd_to_secondary/usd_to_primary,
+  oil_in_primary = usd_price * usd_to_primary.
+- Invalid code (YEN is wrong; JPY is yen): that code RED, do not rebuild/clear every frame (that flash was need_rebuild including not fresh).
+- Pair is RAM only until EEPROM bump. Reboot returns to USD/PHP.
+
+Files touched / to finish
+- WEB.py set_globe_push already patched. Need /set_exchange_pair + status keys exchange_base/quote (will become primary/secondary).
+- WEB_html.py FX boxes added; labels should become PRIMARY / SECONDARY.
+- EXCHANGE.py converting from dissolve to scroll (weather-style continuous_scroll_message).
+- DATA_FETCHER.fetch_exchange still must be rewritten to the PRIMARY model and must not feed oil from the pair rate.
+- OIL.py _fmt_price must stop using exchange_rate; use usd_to_primary.
+- CONFIG: primary, secondary, usd_to_primary, pair_rate. ExchangeDisplayState needs msg/colors/last_built.
+
+Still queued after money works
+- Oil currency as a separate idea is obsolete — primary covers it.
+- USER checkboxes: PACMAN, EXCHANGE, WEATHER, EARTHQUAKE. INTERNET MONITOR always on.
+- Later TECH: local RH / barometer when modules arrive. Then weather scroll variants.
+- Then one EEPROM V3 for: globe already stored; primary/secondary; pattern enables; oil no longer needs a currency enum.
+
+Do not: dual identity on one WEB UI; dual FX or dual oil on the matrix; persist new fields until the grouped EEPROM bump.

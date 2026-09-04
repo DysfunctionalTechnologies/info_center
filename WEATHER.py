@@ -134,7 +134,7 @@ def build_weather_message_and_colors():
     add(compass, COLOR_CYAN, msg_chars, colors)
     add(", ", COLOR_WHITE, msg_chars, colors)
 
-    add("HUM:", COLOR_WHITE, msg_chars, colors)
+    add("RH:", COLOR_WHITE, msg_chars, colors)
     add_number(f"{info_center.weather_humidity}", msg_chars, colors)
     add("%, ", COLOR_WHITE, msg_chars, colors)
 

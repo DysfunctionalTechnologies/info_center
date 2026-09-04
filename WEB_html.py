@@ -45,6 +45,16 @@ HTML = """
     <button id="tempUnitBtn" class="debug-off" onclick="toggleTempUnit()">TEMP: --</button>
     <button id="globePushBtn" class="debug-off" onclick="toggleGlobePush()">PUSH GLOBE: OFF</button>
 
+    <div class="grid-2x3">
+        <label>1
+            <input id="fxBase" maxlength="3" size="3" style="text-transform:uppercase">
+        </label>
+        <label>=
+            <input id="fxQuote" maxlength="3" size="3" style="text-transform:uppercase">
+        </label>
+    </div>
+    <button class="pattern" onclick="setFxPair()">SET FX PAIR</button>
+
     {% if role == "tech" %}
     <br>
     <button class="nav-btn" onclick="window.location='/diag'">TECH</button>
@@ -70,6 +80,12 @@ HTML = """
 
         function toggleGlobePush() {
             call('/set_globe_push?value=' + (window._globePush ? 0 : 1));
+        }
+        function setFxPair() {
+            const b = (document.getElementById("fxBase").value || "USD").toUpperCase();
+            const q = (document.getElementById("fxQuote").value || "PHP").toUpperCase();
+            call('/set_exchange_pair?base=' + encodeURIComponent(b) +
+                 '&quote=' + encodeURIComponent(q));
         }
         slider.addEventListener("mousedown",  () => sliding = true);
         slider.addEventListener("touchstart", () => sliding = true);
@@ -147,6 +163,12 @@ HTML = """
                 tempUnitBtn.textContent = "TEMP: " + (window._tempC ? "C" : "F");
                 tempUnitBtn.className = window._tempC ? "debug-on" : "debug-off";
             }
+            const fxB = document.getElementById("fxBase");
+            const fxQ = document.getElementById("fxQuote");
+            if (fxB && document.activeElement !== fxB)
+                fxB.value = data.exchange_base || "USD";
+            if (fxQ && document.activeElement !== fxQ)
+                fxQ.value = data.exchange_quote || "PHP";
             if (!sliding) slider.value = data.brightness;
         }
         setInterval(() => call("/status", "GET"), 2000);

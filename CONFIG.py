@@ -15,6 +15,9 @@ import threading
 from   EEPROM       import eeprom
 from   FONT_3X6     import FONT_HEIGHT
 from   FONT_3X6     import FONT_WIDTH
+from   PLATFORM     import load_platform
+from   PLATFORM     import layout as platform_layout
+from   PLATFORM     import gpio_pin as platform_gpio
 
 # CONSTANTS
 
@@ -74,6 +77,8 @@ QUAKE_ALERT_MINOR                     = 5.0
 # --- Exchange rate alert thresholds (PHP) ---
 EXCHANGE_ALERT_MAJOR                  = 0.50
 EXCHANGE_ALERT_MINOR                  = 0.25
+EXCHANGE_ALERT_MINOR_PCT              = 0.005
+EXCHANGE_ALERT_MAJOR_PCT              = 0.010
 # --- Weather alert codes ---
 WEATHER_HEAVY_CODES                   = {65, 82}
 WEATHER_THUNDER_CODES                 = {95, 96, 99}
@@ -88,7 +93,7 @@ PACMAN_GHOST_OFFSET                   = 13
 DEFAULT_PANEL_WIDTH                   = 32
 DEFAULT_PANEL_HEIGHT                  = 16
 DEFAULT_PANEL_ORIENTATION             = 180
-PANEL_LAYOUT                          = "16x16"
+PANEL_LAYOUT                          = platform_layout()
 DEFAULT_GLOBE_LED_COUNT               = 23
 # --- Panel layout (rows / columns) ---
 UPPER_PANEL_START_ROW                 = 1
@@ -183,7 +188,10 @@ class ExchangeDisplayState:
         self.dissolve_next            = 0.0
         self.hold_start               = 0.0
         self.arrow                    = None
-
+        self.last_built               = 0.0
+        self.msg                      = ""
+        self.colors                   = []
+        
 class InternetMonitorState:
     def __init__(self):
         self.step                     = 0
@@ -205,7 +213,8 @@ class InfoCenterState:
         self.copyright_string         = "(C)2026"
         self.version_string           = "V1.19"
 
-        self.strip_gpio               = 21
+        self.strip_gpio               = platform_gpio()
+        self.panel_layout             = PANEL_LAYOUT
         self.strip_freq               = 800000
         self.strip_dma                = 10
         self.strip_invert             = False
@@ -304,7 +313,9 @@ class InfoCenterState:
         self.exchange_last_update     = 0.0
         self.exchange_update_interval = EXCHANGE_UPDATE_INTERVAL
         self.last_exchange_rate       = 0.0
-
+        self.exchange_base            = "USD"
+        self.exchange_quote           = "PHP"
+        
         self.oil_wti                  = 0.0
         self.oil_brent                = 0.0
         self.oil_urals                = 0.0
@@ -325,7 +336,7 @@ class InfoCenterState:
         self.lock                     = threading.RLock()
 
         persisted                     = eeprom.load()
-        
+
         self.auto_brightness          = persisted["auto_brightness"]
         self.military_time            = persisted["military_time"]
         self.panel_brightness         = persisted["brightness"]
@@ -336,8 +347,13 @@ class InfoCenterState:
         self.prev_wti                 = persisted["prev_wti"]
         self.prev_brent               = persisted["prev_brent"]
         self.prev_urals               = persisted["prev_urals"]
-        self.globe_push_enabled       = persisted.get("globe_push_enabled", False)
 
+        _plat, _plat_present          = load_platform()
+        if _plat_present:
+            self.globe_push_enabled   = _plat["GLOBE_PUSH"] == "1"
+        else:
+            self.globe_push_enabled   = persisted.get("globe_push_enabled", False)
+            
 info_center = InfoCenterState()
 
 HOURS_TENS, HOURS_ONES = 0, 1

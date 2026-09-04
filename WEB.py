@@ -43,6 +43,9 @@ from   EEPROM         import save_persisted
 from   PANEL          import power_on
 from   PANEL          import power_off
 from   PANEL          import mark_dirty
+from   PLATFORM       import load_platform
+from   PLATFORM       import save_platform
+from   PLATFORM       import PLATFORM_PATH
 from   WEB_login      import HTML_LOGIN
 from   WEB_html       import HTML
 from   WEB_diag       import HTML_DIAG
@@ -383,7 +386,13 @@ def diag():
         return redirect("/login")
     if not is_tech():
         return redirect("/")
-    return render_template_string(HTML_DIAG)
+    cfg, present = load_platform()
+    return render_template_string(
+        HTML_DIAG,
+        plat=cfg,
+        plat_present=present,
+        plat_path=PLATFORM_PATH,
+    )
 
 @app.route("/logs")
 def logs_page():
@@ -465,8 +474,44 @@ def status():
         "alert_quake_yellow": a_qy,
         "alert_quake_red": a_qr,
         "role": session.get("role"),
+        "exchange_base": getattr(info_center, "exchange_base", "USD"),
+        "exchange_quote": getattr(info_center, "exchange_quote", "PHP"),
+        "exchange_rate": float(getattr(info_center, "exchange_rate", 0.0)),        
     })
 
+@app.route("/set_exchange_pair", methods=["POST"])
+def route_set_exchange_pair():
+    if not is_authenticated():
+        return _deny_json()
+
+    def norm(raw, fallback):
+        s = "".join(ch for ch in str(raw).upper() if "A" <= ch <= "Z")
+        return s[:3] if len(s) == 3 else fallback
+
+    base  = norm(request.args.get("base", ""), "USD")
+    quote = norm(request.args.get("quote", ""), "PHP")
+    if base == quote:
+        return status()
+
+    with info_center.lock:
+        changed = (info_center.exchange_base != base or
+                   info_center.exchange_quote != quote)
+        info_center.exchange_base = base
+        info_center.exchange_quote = quote
+        if changed:
+            info_center.exchange_rate = 0.0
+            info_center.last_exchange_rate = 0.0
+            info_center.exchange_last_update = 0.0
+            info_center.exchange.last_built = 0.0
+
+    if changed:
+        try:
+            fetch_exchange()
+        except Exception:
+            logger.exception("Exchange refetch after pair change failed")
+    logger.info("Exchange pair → %s/%s", base, quote)
+    return status()
+    
 @app.route("/set_globe_push", methods=["POST"])
 def route_set_globe_push():
     if not is_authenticated():
@@ -474,6 +519,11 @@ def route_set_globe_push():
     raw = str(request.args.get("value", "0")).lower()
     enabled = raw in ("1", "true", "yes", "on")
     info_center.globe_push_enabled = enabled
+    try:
+        from PLATFORM import save_platform
+        save_platform({"GLOBE_PUSH": "1" if enabled else "0"})
+    except Exception:
+        logger.warning("platform GLOBE_PUSH save failed", exc_info=True)
     from GLOBE_LINK import push_globe
     if enabled:
         push_globe(force=True)
@@ -482,7 +532,7 @@ def route_set_globe_push():
     save_persisted()
     logger.info("Globe push → %s", enabled)
     return status()
-
+    
 @app.route("/set_debug", methods=["POST"])
 def route_set_debug():
     if not is_tech():
@@ -694,6 +744,42 @@ def route_alert_quake_red():
     logger.info("Web quake red toggle → %s", on)
     return status()
 
+def _platform_fields_from_request():
+    return {
+        "PANEL_LAYOUT": request.form.get("PANEL_LAYOUT", "16x16"),
+        "GPIO_PIN": request.form.get("GPIO_PIN", "21"),
+        "GLOBE_PUSH": "1" if request.form.get("GLOBE_PUSH") else "0",
+        "GLOBE_HOST": request.form.get("GLOBE_HOST", "192.168.0.223"),
+        "DIAG_BRIGHTNESS": request.form.get("DIAG_BRIGHTNESS", ""),
+        "DISPLAY_NAME": request.form.get("DISPLAY_NAME", ""),
+    }
+
+
+@app.route("/platform_save", methods=["POST"])
+def route_platform_save():
+    if not is_tech():
+        return redirect("/")
+    cfg = save_platform(_platform_fields_from_request())
+    info_center.panel_layout = cfg["PANEL_LAYOUT"]
+    info_center.strip_gpio = int(cfg["GPIO_PIN"])
+    info_center.globe_push_enabled = cfg["GLOBE_PUSH"] == "1"
+    save_persisted()
+    logger.info("Platform saved %s gpio=%s globe=%s",
+                cfg["PANEL_LAYOUT"], cfg["GPIO_PIN"], cfg["GLOBE_PUSH"])
+    return redirect("/diag")
+
+
+@app.route("/platform_save_reboot", methods=["POST"])
+def route_platform_save_reboot():
+    if not is_tech():
+        return redirect("/")
+    if request.form.get("confirm") != "REBOOT":
+        return redirect("/diag")
+    route_platform_save()
+    logger.info("Platform saved – rebooting")
+    os.system("sudo /sbin/reboot")
+    return "Rebooting...", 200
+    
 _web_started = False
 
 def start_web():

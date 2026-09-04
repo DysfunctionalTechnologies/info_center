@@ -55,6 +55,25 @@ HTML_DIAG = """
         <button id="alertQuakeRBtn" class="alert-btn" onclick="call('/alert/quake_red')">QUAKE (6.0 PLUS)<br>(RED)</button>
     </div>
 
+    <div class="section">Platform (this Pi)</div>
+    <p class="muted">{{ plat_path }}<br>
+    {% if plat_present %}file present{% else %}missing — using defaults{% endif %}</p>
+    <form method="post" action="/platform_save">
+        <label>Name <input name="DISPLAY_NAME" value="{{ plat.DISPLAY_NAME }}"></label><br>
+        <label>Layout
+            <select name="PANEL_LAYOUT">
+                <option value="16x16" {% if plat.PANEL_LAYOUT == "16x16" %}selected{% endif %}>16x16</option>
+                <option value="8x32" {% if plat.PANEL_LAYOUT == "8x32" %}selected{% endif %}>8x32 stacked</option>
+            </select>
+        </label><br>
+        <label>GPIO <input name="GPIO_PIN" type="number" min="0" max="27" value="{{ plat.GPIO_PIN }}"></label><br>
+        <label><input type="checkbox" name="GLOBE_PUSH" value="1" {% if plat.GLOBE_PUSH == "1" %}checked{% endif %}> Globe push</label><br>
+        <label>Globe host <input name="GLOBE_HOST" value="{{ plat.GLOBE_HOST }}"></label><br>
+        <button type="submit">Save</button>
+        <button type="submit" formaction="/platform_save_reboot" name="confirm" value="REBOOT"
+                onclick="return confirm('Save and reboot this Pi?');">Save and reboot</button>
+    </form>
+
     <br>
     <button class="nav-btn" onclick="window.location='/'">← Back to Controls</button>
     <button class="nav-btn" onclick="window.location='/logs'">Logs</button>
