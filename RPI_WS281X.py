@@ -1,8 +1,8 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project: Info_Center_16x32
-# Version: V1.19
-# Date:    September 2, 2026
+# Version: V1.20
+# Date:    September 5, 2026
 # Module:  RPI_WS281X.py
 # Author:  Grok AI with Timothy S. Carlson spectating
 #----------------------------------------------------------#
@@ -111,7 +111,7 @@ class PioStrip(_BaseStrip):
         cls._lib = lib
         return lib
 
-    def __init__(self, count, gpio, freq=800000):
+    def __init__(self, count, gpio, freq=800000, brightness=31):
         lib = self._load()
         if lib.ws_init(int(gpio), int(count)) != 0:
             raise RuntimeError("PIO ws_init failed (gpio=%s n=%s)" % (gpio, count))
@@ -120,11 +120,24 @@ class PioStrip(_BaseStrip):
         self._lib = lib
         self.backend = "pio"
         self.gpio = int(gpio)
-
+        self._hw_brightness = max(0, min(255, int(brightness)))
+        
     def setPixelColor(self, index, color):
+        color = int(color) & 0xFFFFFF
         super().setPixelColor(index, color)
-        self._lib.ws_set(int(index), int(color) & 0xFFFFFF)
-
+        scale = self._hw_brightness
+        if scale < 255:
+            def _dim(ch):
+                if ch <= 0 or scale <= 0:
+                    return 0
+                out = (ch * scale + 127) // 255
+                return out if out else 1
+            r = _dim((color >> 16) & 0xFF)
+            g = _dim((color >> 8) & 0xFF)
+            b = _dim(color & 0xFF)
+            color = (r << 16) | (g << 8) | b
+        self._lib.ws_set(int(index), color)
+                
     def show(self):
         if self._lib.ws_show() != 0:
             raise RuntimeError("PIO ws_show failed")
@@ -145,13 +158,15 @@ def create_strip(count, gpio=21, freq=800000, dma=10,
     logger.info("WS281x host=%s pio=%s gpio=%s n=%s",
                 model, use_pio, gpio, count)
     if use_pio:
-        return PioStrip(count, gpio, freq=freq)
+        return PioStrip(count, gpio, freq=freq, brightness=brightness)
     return PwmDmaStrip(count, gpio, freq, dma, invert, brightness, channel)
-
+    
 #----------------------------------------------------------#
 if __name__ == "__main__":
 #----------------------------------------------------------#
-    print("This module cannot be run directly.")
-    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py")
+    print("This module should not be run directly.")
+    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py\n")
+    from INFO_CENTER import main
+    main()
     exit(0)
 #----------------------------------------------------------#
