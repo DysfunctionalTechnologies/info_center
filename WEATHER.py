@@ -1,8 +1,8 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project: Info_Center_16x32
-# Version: V1.19
-# Date:    September 2, 2026
+# Version: V1.20
+# Date:    September 5, 2026
 # Module:  WEATHER.py
 # Author:  Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -113,25 +113,25 @@ def build_weather_message_and_colors():
     add_one_temp(info_center.temp_c, info_center.temp_f)
     add("/", COLOR_WHITE, msg_chars, colors)
     add_one_temp(info_center.weather_temp_c, info_center.weather_temp_f)
-    add(", ", COLOR_WHITE, msg_chars, colors)
+    add(" ", COLOR_WHITE, msg_chars, colors)
 
     add("WIND:", COLOR_WHITE, msg_chars, colors)
     add_number(f"{info_center.weather_wind_kmh:.0f}", msg_chars, colors)
-    add("KPH, ", COLOR_WHITE, msg_chars, colors)
+    add("KPH ", COLOR_WHITE, msg_chars, colors)
 
     add("GUSTS:", COLOR_WHITE, msg_chars, colors)
     add_number(f"{info_center.weather_wind_gusts:.0f}", msg_chars, colors)
-    add("KPH, ", COLOR_WHITE, msg_chars, colors)
+    add("KPH ", COLOR_WHITE, msg_chars, colors)
 
     add("DIR:", COLOR_WHITE, msg_chars, colors)
     compass = degrees_to_compass(info_center.weather_wind_dir)
     info_center.weather_wind_compass = compass
     add(compass, COLOR_CYAN, msg_chars, colors)
-    add(", ", COLOR_WHITE, msg_chars, colors)
+    add(" ", COLOR_WHITE, msg_chars, colors)
 
     add("RH:", COLOR_WHITE, msg_chars, colors)
     add_number(f"{info_center.weather_humidity}", msg_chars, colors)
-    add("%, ", COLOR_WHITE, msg_chars, colors)
+    add("% ", COLOR_WHITE, msg_chars, colors)
 
     desc = WMO_CODES.get(info_center.weather_code, "UNKNOWN")
     info_center.weather_description = desc
@@ -190,7 +190,9 @@ def display_weather():
 #----------------------------------------------------------#
 if __name__ == "__main__":
 #----------------------------------------------------------#
-    print("This module cannot be run directly.")
-    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py")
+    print("This module should not be run directly.")
+    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py\n")
+    from INFO_CENTER import main
+    main()
     exit(0)
 #----------------------------------------------------------#
