@@ -1,8 +1,8 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project: Info_Center_16x32
-# Version: V1.19
-# Date:    September 2, 2026
+# Version: V1.20
+# Date:    September 5, 2026
 # Module:  CONFIG.py
 # Author:  Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -218,7 +218,7 @@ class InfoCenterState:
         self.program_name_1_string    = "INFO"
         self.program_name_2_string    = "CENTER"
         self.copyright_string         = "(C)2026"
-        self.version_string           = "V1.19"
+        self.version_string           = "V1.20"
 
         self.strip_gpio               = platform_gpio()
         self.panel_layout             = PANEL_LAYOUT
@@ -360,6 +360,8 @@ class InfoCenterState:
         self.alert_low_until          = 0.0
         self.alert_duration           = ALERT_DURATION
         self.alert_source             = ALERT_SOURCE_LIVE
+        self.alert_nouns              = []
+        self.alert_items              = []
         self.web_alert_weather        = False
         self.web_alert_quake          = False
         self.lock                     = threading.RLock()
@@ -410,7 +412,9 @@ YEAR_TENS,  YEAR_ONES  = 4, 5
 #----------------------------------------------------------#
 if __name__ == "__main__":
 #----------------------------------------------------------#
-    print("This module cannot be run directly.")
-    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py")
+    print("This module should not be run directly.")
+    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py\n")
+    from INFO_CENTER import main
+    main()
     exit(0)
 #----------------------------------------------------------#

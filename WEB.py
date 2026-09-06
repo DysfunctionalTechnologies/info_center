@@ -1,8 +1,8 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project: Info_Center_16x32
-# Version: V1.19
-# Date:    September 2, 2026
+# Version: V1.20
+# Date:    September 5, 2026
 # Module:  WEB.py
 # Author:  Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -202,6 +202,18 @@ def _apply_web_alerts():
 
         info_center.quake.last_built = 0.0
 
+        items = []
+        if thunder:
+            items.append(("WX", "THUNDER", "Y"))
+        if heavy:
+            items.append(("WX", "HEAVY RAIN", "R"))
+        if qy:
+            items.append(("QK", "QUAKE 5+", "Y"))
+        if qr:
+            items.append(("QK", "QUAKE 6+", "R"))
+        info_center.alert_items = items
+        info_center.alert_nouns = [t for (_, t, _) in items]
+        
 def _clear_web_alerts():
     global _web_alert_thunder, _web_alert_heavy
     global _web_alert_quake_y, _web_alert_quake_r
@@ -218,9 +230,11 @@ def _clear_web_alerts():
         info_center.alert_until = 0.0
         info_center.alert_high_until = 0.0
         info_center.alert_low_until = 0.0
+        info_center.alert_items = []
+        info_center.alert_nouns = []
         info_center.weather.last_built = 0.0
         info_center.quake.last_built = 0.0
-
+        
 def _clamp_bright(raw):
     val = int(raw)
     val = max(8, min(255, val))
@@ -885,7 +899,9 @@ def start_web():
 #----------------------------------------------------------#
 if __name__ == "__main__":
 #----------------------------------------------------------#
-    print("This module cannot be run directly.")
-    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py")
+    print("This module should not be run directly.")
+    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py\n")
+    from INFO_CENTER import main
+    main()
     exit(0)
 #----------------------------------------------------------#

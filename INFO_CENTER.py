@@ -1,8 +1,8 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project: Info_Center_16x32
-# Version: V1.19
-# Date:    September 2, 2026
+# Version: V1.20
+# Date:    September 5, 2026
 # Module:  INFO_CENTER.py
 # Author:  Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -152,7 +152,7 @@ def pattern_program_name():
                     string1_centered=True,
                     string1_colors=[COLOR_RED, COLOR_WHITE, COLOR_BLUE],
                     string2_to_display=info_center.program_name_2_string,
-                    string2_row=9,
+                    string2_row=8,
                     string2_centered=True,
                     string2_colors=[COLOR_BLUE, COLOR_RED, COLOR_WHITE])
 
@@ -168,7 +168,7 @@ def pattern_copyright():
                     string1_centered=True,
                     string1_colors=[COLOR_RED, COLOR_WHITE, COLOR_BLUE, COLOR_WHITE, COLOR_WHITE],
                     string2_to_display=info_center.copyright_string,
-                    string2_row=9,
+                    string2_row=8,
                     string2_centered=True,
                     string2_colors=[COLOR_WHITE, COLOR_WHITE, COLOR_WHITE, COLOR_BLUE, COLOR_BLUE, COLOR_BLUE, COLOR_BLUE])
 
@@ -279,6 +279,13 @@ def next_loop_pattern(current):
     return LOOP_START
     
 def main():
+    logger.info("#-----------------------------------------#")
+    logger.info("# INFO CENTER (C)2026, Timothy S. Carlson #")
+    logger.info("#           All Rights Reserved           #")
+    logger.info("#    With technical assistance by Grok    #")
+    logger.info("#          Thank you, Elon Musk!          #")
+    logger.info("#-----------------------------------------#")
+    
     if info_center.debug_mode:
         logger.info(f"\n{info_center.program_name_1_string} {info_center.program_name_2_string} Program Started (Version {info_center.version_string})")
         logger.info(f"Panel: {info_center.panel_height}x{info_center.panel_width}")

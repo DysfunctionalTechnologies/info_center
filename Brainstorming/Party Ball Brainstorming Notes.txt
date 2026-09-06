@@ -1,0 +1,33 @@
+Another idea - globes you can place around your room. Rechargeable battery via USB-C. 8-14 RGB LEDs. Low-cost ESP32. Master box for WIFI / cell phone app. Display canned packages or in sync with music - master has a microphone, or 3.5mm stereo input - of bluetooth? Start with master and 2 globes, can buy packs of 1, 2, 4, etc. Great for parties. Waterproof version of the globes that you can float in your pool, or around your hot tub / bathtub.
+
+This one is closer to a real party product. I’ll check what floating/app globes already look like so the pack structure and music-sync choice aren’t naive.This is the most “product-shaped” of the three. Room globes that stay in lockstep, plus a float version, is a party SKU people already buy. The crowded part is one ball + remote + cheap app. The open part is a set that actually stays together, driven by one box next to the speaker. 
+
+amazon.com
+
+What to shipIndoor globe: frosted PE or polycarbonate sphere, 12–20 cm. 8–14 WS2812B/SK6812 on a ring so the ball is a volume of light, not a hot pixel. USB-C charge, 18650 or a 2000–3000 mAh pack, 6–12 h at party brightness. C3 inside. Not waterproof.Master: wall-wart box. Wi‑Fi for the phone, ESP-NOW for the balls. This is the only thing that listens to music.Starter: master + 2 globes. Add-on 1 / 2 / 4. Two balls prove sync; one ball is a nightlight.Float SKU later: same electronics in a sealed, weighted shell. Do not pretend the indoor screw-together globe is a pool toy.Music sync — pick one path and do it wellInput
+Verdict
+3.5 mm line-in on the master
+Best. Tap the speaker / headphone jack / cheap splitter. Clean beat, no “whose mic.” Start here.
+Mic on the master
+Good backup when there is no jack. Put the box next to the speaker. Same as Govee’s sync brick. 
+
+amazon.com
+
+Bluetooth audio into the master
+Tempting, painful. ESP32 as an A2DP sink is fiddly, latency and codec drama. Phone BT to a speaker, line-out or mic to the master, is simpler.
+Phone mic in the app
+Fine as a third mode. Phone has to stay in the room with the music.
+
+Do not put a mic in every globe. They will disagree. Master hears once, broadcasts effect + beat clock over ESP-NOW. Balls only render.Canned packs: warm hangout, slow fade, rainbow crawl, pulse-on-kick, strobe-lite (short, capped). That is enough for v1.Why this can beat a $20 pool ballThose balls each do their own Bluetooth or their own mic. Two of them drift. Your pitch is: the room is one instrument. Drop four globes on shelves, two in the pool later, they all hit the kick together because one box is conducting.Same master story as the fairies and the leak pucks. That is the only reason this belongs in the same company.Waterproof / float is a different productIP68 plus USB-C is the failure point. Options that don’t leak:Magnetic pogo charge in the stand (ball never opens).
+Hidden cap with a real gasket and a rule: “charge dry, then close.” Users will ignore that.
+Induction puck. Costly, works.
+
+Weight the bottom so it floats upright. Chlorine and hot-tub chemicals eat cheap plastics and seals. Bathtub is easier than a pool; say IP67 splash / float in still water before you claim cannonballs.Indoor SKU first. If people buy 4-packs for parties, tool the sealed shell.Cost sketch (indoor, kit qty)Per globe: C3 + 12 LEDs + cell + USB-C charge + sphere + ring ≈ $8–14.
+Master: C3 + mic + 3.5 mm jack + case ≈ $10–15.
+Starter parts: ~$30–45. Retail window that makes sense: starter $59–89, extra pair $29–49. Above that you are fighting Govee on brand, not on the idea.Don’t doSpeaker inside the globe (now you’re a worse JBL).  
+Each globe joins home Wi‑Fi.  
+Fast rainbow at full white all night (battery and neighbors).  
+One SKU that is “indoor décor and pool safe.”
+
+If you only take one of these ideas to a bench, this is the one: two frosted balls, a box with a headphone jack, ESP-NOW beat clock. If they lock to a song in the living room, you have a party product. Fairies and leak pucks can share that box later.
+

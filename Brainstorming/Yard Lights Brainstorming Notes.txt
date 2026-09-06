@@ -1,0 +1,374 @@
+Yard lights. Solar powered. WS2812b LEDs.
+Powered with a cheap ESP32.
+And they network together to be in sync.
+Or to be controlled by a web app on a cell phone.
+
+This is a solid, buildable idea. I’ll quickly check what’s already on the market and the usual power/sync constraints so the feedback is practical.Yes. This is a real product, not just a weekend toy — people have already proven the pieces separately. The interesting part is packaging them as a set of cheap, solar, stake-style yard lights that stay in sync without a hub.What works wellESP32 + WS2812B is a solved pairing. FastLED / WLED / ESP-IDF all drive them cleanly.
+No-router sync is the right call. ESP-NOW is the best fit: low power, no AP required, ~10 ms latency, works across a yard. WLED UDP sync also works if they’re all on home Wi‑Fi, but that dies when the router is far or the lights are on the far side of the house.
+Phone control can be a captive PWA or a lightweight web UI served by one “coordinator” node (or the phone talking BLE/Wi‑Fi to the nearest light). You do not want every stake running a full web server all night.
+
+Existing close cousins: Adafruit path lights on WLED, neighborhood-sync ESP8266 meshes, solar + ESP8266 + WS2812B GitHub builds, and cheap Tuya Bluetooth-mesh solar garden lights. None of those combine addressable pixels + solar stake form factor + cheap ESP32 + no-hub sync as a consumer kit. That’s the gap. 
+
+cdn-learn.adafruit.com
+
+The hard constraint: powerWS2812B at full white is ~60 mA per LED at 5 V. That kills solar stakes fast.Rough budget for one stake:Part
+Current (typical night)
+ESP32 deep sleep
+10–50 µA
+ESP32 awake + ESP-NOW
+80–160 mA bursts
+8 LEDs @ 20% brightness, mixed color
+~80–150 mA
+8 LEDs full white
+~480 mA
+
+A cheap solar path light usually has a tiny panel (~0.5–2 W) and a 600–2000 mAh cell. That is enough for few LEDs, dim, not all night at party brightness.Design rules that make it viable:Cap LEDs per stake: 6–16 pixels, not a meter of strip.
+Hard brightness cap in firmware (e.g. 30–40% max).
+Cut LED 5 V with a MOSFET so pixels draw ~0 when “off.” Don’t leave data line high while power is off.
+ESP32-C3 or C6 SuperMini, not a fat DevKit. Sleep most of the time; wake on timer / ESP-NOW / dusk sensor.
+18650 or 21700 + proper BMS, not the NiMH coin in $6 Walmart lights.
+Panel sized for your worst winter week, not July noon.
+
+If you want “all night rainbow every night,” you need a bigger panel or fewer pixels. If you want “dusk path glow + occasional show,” the cheap solar pack works.Recommended architectureEach lightESP32-C3 SuperMini
+8–12 WS2812B (or SK6812 for better whites / slightly nicer power)
+MOSFET on LED VCC
+18650 + TP4056 or a one-cell LiFePO4 (better winter)
+Small mono panel on the cap
+Light sensor or just “panel voltage = day”
+Waterproof stake / lantern body, IP65+, conformal coat the board
+
+NetworkDefault: ESP-NOW broadcast mesh. No router.
+Optional: one node joins home Wi‑Fi as a bridge so the phone app works from inside the house.
+Sync time, not just “play effect 7.” Broadcast a clock + effect ID + speed + palette. Every node renders locally. That’s how festival badges stay locked without a master. 
+
+hackaday.io
+
+PhoneFirst-run: phone creates a SoftAP or uses BLE to name the set and pick a pattern.
+After that: PWA talks to the Wi‑Fi bridge, or to the nearest light if you’re in the yard.
+Presets: path white, warm dusk, slow aurora, holiday chase, off, “follow the walk” if you later add a cheap PIR on a couple of stakes.
+
+WLED is tempting as firmware, but stock WLED is hungry and assumes Wi‑Fi. A thin custom firmware (or WLED + ESP-NOW usermod + aggressive sleep) will last longer on solar.Product versions that actually sellDIY kit — PCB, stake print, BOM, firmware. Fastest to ship.
+Ready stakes in a 4-pack / 8-pack — this is the consumer product. People buy packs of dumb solar path lights already.
+One “brain” stake + dumb-looking siblings — only if you want cheaper satellites. I wouldn’t; identical nodes are simpler.
+
+Price target that makes sense: under the “nice solar path 8-pack” on Amazon, with the wow being they dance together and you pick colors on your phone.Pitfalls that kill thisToo many LEDs per stake.
+Wi‑Fi left on 24/7.
+Cheap NiMH + winter.
+Range: ESP-NOW is fine across a typical yard; houses and metal fences eat it. Plan a mid-yard repeater or a node on a taller post.
+Moisture in the stake. This is where most DIY outdoor LED projects die.
+Neighbor Wi‑Fi channel fights if you also join the home network.
+Claiming “all night full RGB” on a $8 panel.
+
+What I’d prototype firstOne weekend:3 stakes, 8 pixels each, C3 + 18650 + MOSFET + small panel.
+ESP-NOW time-sync + 4 effects.
+Phone page: brightness, effect, color.
+
+If they survive a week outside and stay locked, the idea is product-shaped. If the batteries are dead by 10 pm, you shrink the LED count before you write more software.If you want, next we can spec a concrete BOM and a first firmware split (sleep schedule, packet format, web UI).
+
+The solar panel is the dusk sensor. Or network time (if available), display from dusk to midnight.
+I like the "normally glow, occasionally show" idea.
+Maybe WIFI / ESP-NOW only during dusk. Does ESP-NOW have a low power mode and can be woken by a master?
+Maybe the master is a box you plug in inside the house. No lights, but the connection between the WIFI and the ESP-NOW.Can you gen up a first-pass BOM and cost for a 8 light set, without and with the in-house master?
+
+I’ll price a realistic 8-pack BOM and check how ESP-NOW behaves in low-power / wake-from-master mode so the architecture matches the dusk-only plan.Yes on the architecture. Short version on radio, then the numbers.ESP-NOW and sleepESP-NOW is just connectionless Wi‑Fi. Deep sleep turns the radio off. A packet from the house cannot wake a deep-sleeping stake. There is no LoRa-style “RX IRQ from master.”What you can do on ESP32-C3:Deep sleep (day / after midnight): ~5–20 µA. Wake on RTC timer and/or “solar panel voltage dropped” (dusk). Cannot hear the master.
+Connectionless power-save (evening): esp_wifi_connectionless_module_set_wake_interval() + esp_now_set_wake_window(). Radio sleeps, then opens a short RX window on a schedule. Master must beacon in that window. Latency = interval (0.5–5 s is reasonable). Average radio current can be low if the window is short. 
+
+documentation.espressif.com
+
+Light sleep / auto light sleep: CPU paused, radio can still catch scheduled traffic. Wake in under ~1 ms. Higher current than deep sleep, fine for “glow hours.”
+
+So: master cannot poke a dead-asleep light. It can talk to lights that have already decided it is evening and opened RX windows.That matches your plan:Panel voltage = day/dusk sensor. Optional NTP only on the indoor box.
+Day: lights deep sleep, wake every 5–15 min, read panel + battery, go back down.
+Dusk → midnight: MOSFET on, dim glow, radio in ESP-NOW power-save.
+After midnight or low battery: MOSFET off, deep sleep until next dusk check.
+Indoor box is always on. It is the Wi‑Fi  ESP‑NOW bridge and the time source. Lights never join home Wi‑Fi.
+
+Without the box, one stake has to stay awake as leader and/or raise a SoftAP when you walk up with the phone. Doable, worse UX, worse battery.Assumptions for this BOM8 stakes, 8 WS2812B each (glow, not a party strip).
+ESP32-C3 SuperMini class board.
+One 18650 + TP4056 (protection) + 5 V boost for the pixels + P-MOSFET to cut LED power.
+~5–6 V, 1.5–2 W panel on the cap (dusk sensor + charge).
+First-pass = buy retail/Ali small-qty parts and 3D-print or gut cheap path-light bodies. Not a factory housing.
+USD, mid-2026 hobby pricing. Shipping, tax, solder, printer filament waste, and your time not included.
+“Kit qty” ≈ 10–50 pieces from Ali/LCSC, not 10k factory.
+
+Per-light electronicsItem
+Prototype each
+Kit qty each
+Notes
+ESP32-C3 SuperMini
+$2.50
+$1.60
+Ali ~$1.50–1.70 in tens; Amazon packs ~$3–4 ea. 
+
+accio.com
+
+WS2812B 8-LED ring
+$1.40
+$0.90
+Ali often ~$1; Amazon 8-rings are $2–3. 
+
+aliexpress.com
+
+18650 2500–3000 mAh
+$2.80
+$2.20
+Name-brand cells; avoid mystery ultra-cheap.
+18650 holder
+$0.25
+$0.15
+
+TP4056 + protection, Type‑C
+$0.40
+$0.20
+Fine on solar if you add a diode; 1 A is enough. 
+
+accio.com
+
+5 V boost (MT3608 or 2 A mini)
+$0.50
+$0.30
+Pixels want 5 V; cell is 3.3–4.2 V.
+P-MOSFET + gate resistor + 1000 µF on 5 V
+$0.35
+$0.20
+Kill LED rail when “off.”
+5–6 V 1.5–2 W mini panel
+$2.20
+$1.60
+1 W is tight for winter glow. 
+
+alibaba.com
+
+Schottky + passives + wire
+$0.50
+$0.30
+Panel diode, bulk cap, ADC divider on panel.
+Small carrier PCB (or proto)
+$1.00
+$0.60
+First units: proto board. Later: one cheap 2-layer.
+Electronics subtotal
+$11.90
+$8.05
+
+Per-light mechanicalItem
+Prototype each
+Kit qty each
+Notes
+Stake + lamp body + diffuser
+$4.00
+$3.00
+Gut a cheap solar path light, or print cap + buy stake. This dominates cost and failure rate.
+Silicone / grommets / coat
+$0.40
+$0.25
+
+Mechanical subtotal
+$4.40
+$3.25
+
+One complete light
+~$16.30
+~$11.30
+
+Indoor master (optional)Item
+Prototype
+Kit qty
+Notes
+ESP32-C3 or C3 SuperMini
+$3.00
+$2.00
+S3 only if you want a fancier UI later.
+USB-C 5 V 1 A brick
+$5.00
+$4.00
+Or use any phone charger.
+Project box
+$4.00
+$3.00
+Near a window or exterior wall helps ESP-NOW.
+Optional 2.4 GHz whip / u.FL pigtail
+$3.00
+$2.00
+Worth it if the house is a Faraday cage.
+Status LED + button
+$0.40
+$0.25
+Pair / reset.
+Master box
+~$15.40
+~$11.25
+No battery, no LEDs, always on.
+
+Skip the extra antenna on the first bench test.8-light set totalsConfig
+Prototype parts
+Kit-qty parts
+8 lights, no master
+~$130
+~$90
+8 lights + indoor master
+~$146
+~$102
+Cost per planted light, no master
+~$16
+~$11
+Same, with master amortized
+~$18
+~$13
+
+Add ~$15–30 shipping on the first Ali order, and expect to buy 10 of some parts because MOQs and “one dead C3.”Not in the number: firmware time, failed prints, UL/CE, custom molded housing, a real phone app store listing. A molded IP65 body in volume could drop or rise versus gutted $3 path lights, depending on tooling.How this lines up with “glow, sometimes show”Night energy, one stake, 8 pixels at ~15–20% mixed color:LEDs ≈ 80–120 mA at 5 V → ~0.5 W  
+Boost loss + C3 in ESP-NOW power-save ≈ 0.15–0.3 W  
+Total ≈ 0.7–1.0 W while glowing
+
+A 2500 mAh 18650 is ~9 Wh usable. That is 9–12 hours of dim glow, which is dusk→midnight with margin if you are not doing full-white rainbow. A 10-minute “show” at 40% brightness is fine. All-night rave is not.Panel: 2 W nameplate is ~0.6–1.2 Wh on a mediocre day, several Wh on a good one. Summer works. Winter + shade is why you stop at midnight and cap brightness in firmware.I’d buy firstFor a proof 8-pack with the house box:10× C3 SuperMini (2 spares)  
+10× 8-LED rings  
+10× 18650 + holders + TP4056  
+10× 2 W 6 V panels  
+10× boost + MOSFET bits  
+1 project box + USB brick  
+8 cheap path-light bodies to cannibalize
+
+Expect about $150 on the doorstep the first time, then ~$100 in parts if you build a second set.If you want the next pass, I can turn this into a per-stake wiring list (which GPIO, MOSFET type, ADC divider for the panel) and a dusk-state machine that the master and the lights both run.
+
+So usually soft-glow white, or a picked color, or alternating colors (no fast patterns, just a slow fade up/down, not very bright) - from 6pm to midnight (6 hours), fantastic patterns for only one hour total, the rest just soft-glow. For 10 minutes ever hour or 5 minutes every half hour.
+
+That duty cycle is the right product. Six hours of dim glow plus one hour of “show” is well inside a single 18650 if you keep glow actually soft.ScheduleWindow: 18:00–00:00 (or dusk–midnight if dusk is later).
+Show budget: 60 minutes total, not more.Two cadences that both hit 60 minutes:Cadence
+Burst
+Times in 6 h
+Feel
+A
+10 min / hour
+:00–:10 each hour
+A short event, then long calm
+B
+5 min / 30 min
+12 bursts
+More frequent, easier to miss if you step outside at the wrong time
+
+I’d ship A as default (10 minutes at :00) and let the app pick B. Hourly is easier to explain and easier on the radio (one “show on / show off” pair per hour).Master clock does the timing. Lights just render “glow” or “show” from the last packet. If the house box is offline, lights keep glow-only until midnight.Brightness so the battery survivesTreat PWM percent as a hard cap in firmware.Mode
+Brightness
+Look
+LED current (8 px, mixed / warm)
+System power (LEDs + boost + C3)
+Soft glow
+8–15%
+Path light, not a beacon
+~50–80 mA @ 5 V
+~0.45–0.70 W
+Slow alternate
+10–18%
+Two colors fading over 8–20 s
+similar
+similar
+Show
+25–40%
+“fantastic,” still not full white
+~150–250 mA
+~1.1–1.6 W
+Forbidden
+100% white
+melts the night budget
+~480 mA
+~2.8 W+
+
+Soft glow should be a single color or a slow AB crossfade (10–30 s), never a chase. Show can be the fancy palettes for those 5–10 minutes.Energy for your nightUsing mid values (glow 0.6 W, show 1.4 W):5 h glow → 3.0 Wh
+1 h show → 1.4 Wh
+Night total ≈ 4.4 Wh
+
+A 2500 mAh 18650 is ~9.25 Wh raw, ~7 Wh after boost and cutoff. You have roughly 50% headroom on a full cell. That covers a cold night, an extra show the user triggers from the phone, and the radio.The limiter is still daytime charge in winter / shade, not this 6-hour plan. If the cell is at 3.6 V at dusk, firmware should skip shows and glow even dimmer.Phone presets (keep it tiny)Warm white glow  
+Cool white glow  
+Picked color glow  
+Alternate two picked colors (slow fade)  
+Show style (3–5 patterns max)  
+Burst cadence: 10 min/h or 5 min/30 min  
+Off / until midnight only
+
+No need for a pattern designer on v1.Rule of thumbIf it looks bright from the street, it is too bright for solar. Soft glow should look like a good $20 path light. The hourly 10-minute burst is the product trick — people notice the yard “doing something,” then it goes quiet again.
+
+Can the slave units report back to the master?
+
+Yes. ESP-NOW is two-way. Slaves can unicast a short packet to the master’s MAC whenever their radio is already up.They should not keep a session open. Report on the evening RX window, then sleep.What to sendKeep it under ~50 bytes:node id  
+battery mV  
+panel mV (or “day/dusk/night”)  
+RSSI of last master beacon  
+uptime / reboot reason  
+current mode (glow / show / off)  
+last error (boost fail, LED rail off, brownout)
+
+That is enough for the phone UI: “light 3 is at 3.62 V, weak signal.”When they talkDo not stream. Piggyback on the schedule you already have:Master beacons every 1–2 s during 18:00–00:00.  
+Slave wakes for its RX window, hears the beacon.  
+Once per 5–15 minutes, slave replies with telemetry.  
+After a show starts/stops, one extra ack is useful.  
+Daytime: stay in deep sleep. No reports unless you wake for a panel check and the master happens to be beaconing (usually it shouldn’t by day).
+
+If 8 lights each send 20 bytes every 10 minutes, the airtime is nothing.ReliabilityESP-NOW unicast can request an ack. Use that for telemetry. Broadcast is fine for “all lights, glow warm.”If a slave is at the far end of the yard, another slave can forward one hop. Don’t build a full mesh on v1. If light 7 can’t hear the house, put light 4 in between and allow “relay this 32-byte packet.” That is a later firmware flag, not a requirement for the first set.Power costA 20-byte TX is milliseconds at ~80–150 mA. Once every 10 minutes it is noise next to the LEDs. The expensive part is leaving the radio on, not the reply.What the master does with itWeb page: list of 8 stakes, battery bars, last seen.  
+Skip shows on any node below ~3.55 V (or whatever cutoff you pick).  
+Dim the whole set if several nodes are low.  
+Flag a dead node if it misses two evening windows.
+
+So: slaves report back easily. Treat it as occasional status, not a chatty sensor network.
+
+So we could also have a report to the user that "Unit A is not charging like the other units. May be shaded at times during the day. Consider relocating."Interesting. A little pricey, but if they sell then can work on supplier prices.
+
+Yes. That message is one of the few things that makes a “smart” path light worth more than a dumb pack from Amazon.How to detect shade without being cleverDon’t model the sun. Compare siblings.Each night the master stores, per unit:dusk voltage  
+voltage at midnight  
+optional: a couple of daytime samples if a unit woke for a panel check
+
+After 3–4 days with similar weather:Unit A’s dusk voltage is consistently ~0.15–0.25 V below the set median, or
+A loses more overnight than the others (same glow/show schedule)
+
+Then, once, not every night:Unit A isn’t charging as well as the others. It may be shaded during the day. Try a sunnier spot.
+Rules so it doesn’t nag:Need a cluster of 4+ units or the comparison is junk  
+Ignore the first 2 nights (new battery, first charge)  
+Don’t fire after one cloudy day  
+Clear the flag if A recovers for 3 days after a move  
+Never say “broken” unless it also stops reporting
+
+Same data gives “Unit C battery dropping fast — show brightness was limited tonight,” which is the other useful sentence.PricePrototype 8-pack at ~$130–150 parts is the wrong number to judge the product by. That is one-off Ali + 18650 retail + gutted housings.If they sell:Stage
+COGS per 8-pack (parts)
+What changed
+First 10 kits you build
+$90–120
+Current plan
+100–500, Ali/LCSC, simple 2-layer PCB
+$55–75
+No SuperMini boards, no Amazon cells, panel + stake sourced as a set
+1k+ with a molded cap/stake
+$40–60
+Housing is the lever; electronics are already cheap
+
+Electronics are not the problem. The stake, diffuser, panel, and waterproofing are. A custom all-in-one cap (panel + 8 LEDs + small PCB + 18650 sled) is what gets you to a $79–129 retail 8-pack, which is where people already buy decorative solar path lights.Positioning that can carry a bit of price:they stay in sync  
+phone sets color / slow fade  
+one short “show” an hour  
+“this one is in the shade”
+
+That last line is support you don’t have to staff.Build three units first and log voltages for a week in sun vs partial shade. If the shade gap is obvious in the numbers, the feature is real and you can keep the BOM as-is until demand shows up.
+
+The housing is a pain. The initial cost of custom molds - ugh. Maybe can use existing housing, but don't want to be confused with a competitor's produce by looks. But something that looks good during the day as well as at night.
+Sealing from the elements is the biggie. Even condensation on the inside. They will be exposed to everything sitting outside.Huh, a fairy holding a globe, and the globe glows at night. Solar panels in the fairy wings. Starter pack with the master box and one or two fairies, can buy additional fairies separately.
+
+Fairy-and-globe is a strong SKU if sealing is designed first. I’ll glance at what’s already sold as solar fairy path lights so the shape advice isn’t naive.Fairy holding a glowing globe is a good SKU. The category already exists as dumb $20–45 metal/resin stakes with one warm LED and a glass ball. Your version is the same garden object, plus sync, color, a short nightly show, and “this one is in the shade.” That is enough distance from the Amazon lookalikes if the silhouette is yours and the globe is doing real addressable light, not a single yellow diode. 
+
+amazon.com
+
+Do not start with a multi-part injection-mold fairy. That is the $15k–80k trap.Housing without a factory moldSplit the object into three parts that age at different rates:Globe — bought. Frosted or crackle glass / polycarbonate sphere, 80–120 mm. Lighting suppliers already sell these. The 8 WS2812B sit on a small ring inside the globe, aimed at the skin so it reads as a full orb, not a hot spot.
+Electronics can — a small off-the-shelf IP67 junction box or a printed cylinder in the fairy’s seat / the globe’s neck. This is the only volume that must stay dry.
+Fairy + wings + stake — first 20–50 units: resin print or silicone-mold resin cast (a $50–200 mold you pour yourself, not a steel tool). Paint like garden statuary. When a pose sells, then tool that one figure.
+
+Daytime look lives in the statue. Nighttime look lives in the globe. You can change the fairy later without redesigning the sealed can.Wings as the only panel will starve it. Fairy wings are small and often vertical. Use wings as part of the array if you want the story, and put the real 1.5–2 W panel as a “leaf,” a hat brim, or a flat pad behind the shoulders, aimed up. Panel voltage still doubles as the dusk sensor.Sealing: do not try to hermetically seal the globeA closed lamp sitting in sun, then cold night, will condense. A perfectly glued globe is worse than a slightly open one. Pressure swings also pull wet air past gaskets. 
+
+gore.com
+
+Practical stack:Globe optical cavity: allowed to breathe. One downward-facing hole with an ePTFE sticker vent (Gore-style or a cheap IP67 “breather valve,” ~$0.20–1). Vapor out, rain not in.
+Electronics can: separate. Gasket or pot the PCB in the can with only three wires up into the globe (5 V, GND, data). If the globe fogs, the C3 and 18650 still live.
+Potting: conformal coat the board; pot the can if you can still reach the USB/flash pads once. Don’t pot the LEDs.
+Cable path: gland or a drip loop where the stake meets the figure. No flat seams facing the sky.
+Target: IP65 on the can. Globe can be IP44-ish if the vent is under a lip.
+
+Condensation on the inside of the glass is a lens problem, not always an electronics problem. Frosted globes hide light fog; clear globes show every drop. Frosted is the right first globe.Starter packThis merchandising is better than an 8-pack of identical path lights.Starter: indoor master + 2 fairies (different poses if you can). Enough to see sync. Price against a pair of decorative statues plus a “hub,” not against a 10-pack of $2 sticks.
+Add-on: one fairy in a box. Same firmware, joins the set when the master sees a new MAC at dusk.
+Later poses (sitting, standing, lantern) reuse the same neck/can/globe. Only the printed statue changes.
+
+Two is the right starter count. One fairy next to a wall wart is a nightlight. Two proves the mesh.What will actually kill unitsNot the ESP32. Standing water in the neck, UV-brittle resin wings, and a panel aimed at a fence. Design the can so a dead battery is a twist-off sled. Design the globe so a user can unscrew it and wipe the inside. If they have to throw away a $40 statue because of fog, they won’t buy a third fairy.Prototype path: one bought globe, one printed fairy, panel on a leaf, electronics in a $4 IP67 box hidden in the base. Live outside for a month. If the globe fogs and the can stays dry, you have a product. Then worry about molds.
+

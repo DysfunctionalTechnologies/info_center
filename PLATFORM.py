@@ -1,13 +1,18 @@
-# ============================================================================
-# PLATFORM.py
-# Per-machine hardware identity for Info Center
-# Author: Timothy S. Carlson
-#
-# File: .platform  (same directory as this module / .web_auth)
-# Missing file -> defaults. Never required to boot.
-# ============================================================================
+#----------------------------------------------------------#
+#----------------------------------------------------------#
+# Project: Info_Center_16x32
+# Version: V1.20
+# Date:    September 5, 2026
+# Module:  PLATFORM.py
+# Author:  Timothy S. Carlson - with Grok AI's assistance
+#----------------------------------------------------------#
+#----------------------------------------------------------#
 
+# System Imports
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 PLATFORM_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".platform")
 
@@ -121,7 +126,9 @@ def display_name():
     return load_platform()[0]["DISPLAY_NAME"]
 
 
+#----------------------------------------------------------#
 if __name__ == "__main__":
+#----------------------------------------------------------#
     print("============================================================")
     print(" PLATFORM.py")
     print("============================================================")
@@ -130,3 +137,9 @@ if __name__ == "__main__":
     print("present: ", present)
     for key in DEFAULTS:
         print("  %s=%s" % (key, cfg[key]))
+    print("\nThis module should not be run directly.")
+    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py\n")
+    from INFO_CENTER import main
+    main()
+    exit(0)
+#----------------------------------------------------------#

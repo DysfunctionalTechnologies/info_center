@@ -1,0 +1,31 @@
+Okay, spinning that idea around a bit - those wetness warning devices, I used to have 4 or 5 about 20yrs ago. You set them down in suspect wet spots, or by water tanks, or whatever, and they scream if they detect water.
+What if we did detected with the ESP32, ESP-NOW, when they get wet they scream PLUS they notify your cell phone, and you can identify which detector went off, so you know where the problem is.
+
+That’s a different product with a real job. I’ll check how the cheap screamers and the app-connected leak sensors are sold now so the pitch isn’t “Govee with extra steps.”That product already exists, and the good versions look a lot like what you just described.Govee / YoLink / similar: small puck, contacts on the bottom, ~100 dB local scream, hub on Wi‑Fi, phone/email says which named sensor went off. Multi-packs with a hub are $30–60. Battery claims are 2–5 years. Wirecutter and CNET treat this as a solved category. 
+
+nytimes-com.zproxy.org
+
+So the idea is valid. It is not a blue-ocean idea. The question is whether your stack is a better puck, not whether “wetness + scream + phone” is a job.Your stack maps cleanlySame architecture as the fairies, different payload:Indoor master on USB: Wi‑Fi for the phone, ESP-NOW for the yard/house.
+Slaves: deep sleep almost forever. Two gold-plated feet (or a probe cable) on a GPIO. Water = wake.
+Wake → scream + ESP-NOW “ALARM, id=Laundry, vbat=…” → master pushes to the phone.
+Name them in the web UI: Water heater, Tank overflow, Under sink.
+
+ESP-NOW is actually a good fit here. A leak detector should not sit on Wi‑Fi. Deep sleep + GPIO wake + one short packet is how you get years on AAAs. People have already flashed Tuya leak pucks to ESP-NOW for that reason. 
+
+github.com
+
+Phone notify still needs the master on the internet (or at least on the LAN if you are home). If the house WAN is down, you still get the scream. That is the right failure mode.Where you could beat the $12 Amazon puckNot “has an app.” They all have an app.Possible edges:No cloud. Master is on the LAN. Works when Govee’s servers hiccup. Attractive to the same person who wanted local fairy control.
+Named location that is actually useful plus a map of the property (shop, cistern, well house, AC pan).
+One hop relay so a unit in a metal shed still reaches the house. Govee uses a hub + LoRa on the nicer SKUs; ESP-NOW hop is the cheap version.
+Scream on the master too. Basement puck screams, kitchen box screams. Old-school water alarms only yelled where the leak was.
+Same master as the fairies. One plug, two product lines. That is the only strategic reason to build this next to the lights.
+
+If it is just another AAA puck + cloud app, Govee already won on price and reviews.Hardware notesDetect: two stainless probes or a flex PCB on the belly. Optional 1 m extension for drip pans.
+Latch the alarm until dry or muted from the phone. Old screamers that stop when you pick them up are annoying; ones that never mute are worse.
+Debounce 1–2 s so a splash doesn’t page you.
+Heartbeat every 12–24 h so “Unit C went silent” is a feature, same as the shade warning on the fairies.
+Siren: a real piezo, 90–100 dB. The ESP32 DAC into a toy speaker will not cut it in a boiler room.
+Power: 2×AAA or CR123, not a 18650. This device sits for years. ESP32-C3 deep sleep can do that if you are disciplined; a SuperMini with a power LED left on will not.
+
+Honest takeBuild this if you already have the indoor master and want a second SKU that uses it. Do not build it as the first product. The fairy/globe thing is differentiated by look and behavior. This one is differentiated only if it is local, named, and lives in sheds and pump houses the consumer pucks don’t reach.Starter pack here is the same shape as the lights: master + 2 detectors, extra pucks sold alone. Put them under the water heater and the fridge on day one. That is how people understand the product.
+

@@ -1,0 +1,531 @@
+########################################################################
+# Hey, Grok. I have an interesting project to do tomorrow.             #
+# I am going to take a newly imaged SD card for a Raspberry PI 3B+,    #
+# and run through the whole process of setting the RPi3B+ up and       #
+# getting a DS3231 with RTC and EEPROM, DS18B20, and a WS2812b LED     # 
+# strip working. I want to document it, step-by-step.The goal is good  # 
+# end-user documentation. And to get my INFO_CENTER python code        #
+# running on the RPi3B+ with no errors.                                #
+########################################################################
+
+I'll pull current Raspberry Pi OS setup steps plus the exact wiring and
+software notes for the DS3231, DS18B20, and WS2812B so the documentation
+is accurate for a fresh 3B+ image.
+
+The project is public on GitHub. Next I’ll read the hardware-facing
+modules so the setup steps match the code’s pin and library assumptions.
+Here is a complete walkthrough you can follow tomorrow and turn into
+end-user documentation. It is written to match INFO_CENTER V1.19 as it
+exists in your repo: EEPROM at 0x57, DS18B20 via
+/sys/bus/w1/devices/28*, and the WS2812B strip on GPIO 21 with
+rpi_ws281x.The code does not talk to the DS3231 clock chip itself.
+Linux should own 0x68 via the i2c-rtc overlay. Your Python only uses
+the AT24C32 EEPROM at 0x57.INFO_CENTER on Raspberry Pi 3B+Fresh image
+through working hardware
+
+Hardware target: Raspberry Pi 3 Model B+
+Software target: INFO_CENTER V1.19
+Assumed layout:  16×32 panel (512 LEDs) + 23 globe LEDs = 535 LEDs on one strip, data on GPIO 21
+
+0. What this setup is
+Device               Bus     Address / pin  What INFO_CENTER uses it for
+DS3231 RTC           i2C-1   0x68           Keep wall-clock time with no
+                                            network. Owned by the kernel.
+
+AT24C32 EEPROM       I2C-1   0x57           Persist brightness, units,
+(on the same module                         last prices, flags
+ as the DS3231 device)                      (EEPROM.py / smbus2) 
+
+DS18B20              1-Wire  GPIO 4 (pin 7) Indoor/local temperature
+                             by default     (TEMPERATURE.py)
+
+WS2812B strip                GPIO 21 (pin 40), PCM + DMA 10
+535 pixels
+Panel + globe (RPI_WS281X.py / rpi_ws281x)
+
+GPIO 21 is a good choice on a 3B+. It uses PCM, so analog headphone audio can still work. I2S HATs will not.1. Parts and power (read this before wiring)RequiredRaspberry Pi 3B+ and official 5.1 V / 2.5 A micro-USB supply for the Pi only
+Newly imaged microSD (16 GB minimum, 32 GB better, A1/A2)
+DS3231 module that includes the AT24C32 EEPROM
+DS18B20 (TO-92 or waterproof probe)
+4.7 kΩ pull-up for the DS18B20 data line
+WS2812B strip / matrix
+330 Ω resistor on the LED data line
+1000 µF (or larger) electrolytic capacitor across LED 5 V and GND, close to the strip
+Separate 5 V supply for the LEDs
+Common ground between LED PSU, strip GND, and Pi GND
+Optional but recommended: 3.3 V → 5 V level shifter on the LED data line
+
+Power warning
+535 WS2812B LEDs at full white can draw on the order of 30 A. Do not power the strip from the Pi 5 V pins. Size the LED supply for worst case, inject 5 V at both ends (and every ~1–2 m on a long strip), and start software brightness low. INFO_CENTER defaults around brightness 31–32, which is safer, but a wiring mistake at first boot can still brown out the Pi.Work with power disconnected while changing wiring.2. Image the SD cardOn a PC:Install Raspberry Pi Imager.
+Device: Raspberry Pi 3.
+OS: Raspberry Pi OS (64-bit) with desktop if you want a monitor, or Lite if the panel is the only display. Lite is enough.
+Storage: the new microSD.
+Open OS customisation before writing:hostname, e.g. info-center
+username / password
+Wi-Fi SSID, password, country
+locale, timezone, keyboard
+enable SSH
+
+Write, eject, insert the card in the Pi.
+
+Pi 3B+ uses full-size HDMI and micro-USB power. Insert the card label-out, then power.First boot expands the filesystem. Give it a few minutes. If you preconfigured Wi-Fi and SSH, you can stay headless:bash
+
+ssh USER@info-center.local
+
+3. First login, update, groupsbash
+
+sudo apt update
+sudo apt full-upgrade -y
+sudo reboot
+
+After reboot:bash
+
+sudo usermod -aG i2c,gpio,spi $USER
+
+Log out and back in (or reboot) so group membership applies.Install tools you will need:bash
+
+sudo apt install -y \
+  git \
+  i2c-tools \
+  python3-pip \
+  python3-venv \
+  python3-smbus2 \
+  python3-dev
+
+python3-smbus2 from apt is preferred. If it is missing on your image, install smbus2 with pip in the venv later.4. Enable I2C, 1-Wire, and the RTC overlayOption A — raspi-configbash
+
+sudo raspi-config
+
+3 Interface Options → I2C → Yes
+3 Interface Options → 1-Wire → Yes
+Finish. Do not reboot yet.
+
+Option B — edit config directlyOn current Raspberry Pi OS the file is:bash
+
+sudo nano /boot/firmware/config.txt
+
+Ensure these lines exist (uncommented):ini
+
+dtparam=i2c_arm=on
+dtoverlay=w1-gpio
+dtoverlay=i2c-rtc,ds3231
+
+w1-gpio defaults to GPIO 4 (physical pin 7), which matches TEMPERATURE.py.If you must put the DS18B20 on another pin:ini
+
+dtoverlay=w1-gpio,gpiopin=17
+
+GPIO 21 is reserved for the LED strip. Do not put 1-Wire there.Save and reboot:bash
+
+sudo reboot
+
+5. Wire the hardware (Pi powered off)Physical pin numbers are the 40-pin header numbers, not BCM numbers.5.1 DS3231 + EEPROMModule
+Pi
+VCC
+Pin 1 — 3.3 V
+SDA
+Pin 3 — GPIO 2
+SCL
+Pin 5 — GPIO 3
+GND
+Pin 6 — GND
+SQW
+unused
+32K
+unused
+
+Use 3.3 V, not 5 V. The Pi I2C pins are 3.3 V only.5.2 DS18B20Sensor
+Pi
+VDD (red on most waterproof probes)
+Pin 17 — 3.3 V
+GND (black)
+Pin 9 — GND
+DQ (yellow/white)
+Pin 7 — GPIO 4
+
+Solder or breadboard a 4.7 kΩ resistor between DQ and 3.3 V. Without it the sensor often does not appear.5.3 WS2812BStrip
+Connection
+5 V
+External 5 V PSU + (not the Pi)
+GND
+External PSU − and Pi pin 39 GND
+DIN
+330 Ω resistor → Pi pin 40 / GPIO 21
+
+Put the 1000 µF capacitor across strip 5 V and GND at the strip input. If you have a level shifter, Pi GPIO 21 → shifter 3.3 V in → 5 V out → 330 Ω → DIN.Power-on order later: LED PSU first (or together), Pi second. Never leave DIN connected while the strip is unpowered and the Pi is on for long periods.6. Prove each device before touching PythonPower the Pi. Do not run INFO_CENTER yet.6.1 I2C: RTC + EEPROMbash
+
+sudo i2cdetect -y 1
+
+You want something like:
+
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+50:                         57
+60:                         68
+
+After the RTC overlay is loaded, 68 usually becomes UU (kernel driver claimed it). 57 must stay a number, not UU. If 57 is UU, something else claimed the EEPROM and EEPROM.py will fail.If you see nothing:wiring / 3.3 V
+ls /dev/i2c-1
+groups includes i2c
+
+6.2 Make the DS3231 the system clockbash
+
+ls /dev/rtc*
+dmesg | grep -i rtc
+
+You should see /dev/rtc0 and rtc-ds1307 / ds3231 messages.Remove the fake clock so a dead network does not invent a 1970-era time:bash
+
+sudo apt remove -y fake-hwclock
+sudo systemctl disable fake-hwclock 2>/dev/null || true
+
+If the Pi currently has good network time:bash
+
+date
+sudo hwclock -w
+sudo hwclock -r
+
+-w writes system time → RTC. -r reads RTC.If you are offline and the RTC already has a good time:bash
+
+sudo hwclock -s
+date
+
+Optional check that time survives a reboot with Ethernet/Wi-Fi disconnected.INFO_CENTER displays date / local system time. Getting this right is how the panel keeps time after a blackout.6.3 DS18B20bash
+
+ls /sys/bus/w1/devices/
+
+You need a directory starting with 28-. Then:bash
+
+cat /sys/bus/w1/devices/28-*/w1_slave
+
+Good output ends with YES and a t= value in thousandths of a degree C:
+
+t=21437
+
+That is 21.437 °C. 85.000 (t=85000) usually means the sensor never completed a conversion (power, pull-up, or clone chip).If there is no 28-* folder:pull-up missing
+data not on GPIO 4
+overlay not applied (dtoverlay=w1-gpio)
+
+6.4 GPIO 21 sanitybash
+
+gpioinfo | grep -n "GPIO21\|GPIO 21" || true
+python3 -c "import pathlib; print(pathlib.Path('/sys/firmware/devicetree/base/model').read_text())"
+
+You should see Raspberry Pi 3 Model B Plus. RPI_WS281X.py will then take the PWM/PCM/DMA path, not the Pi 5 PIO .so.7. Install INFO_CENTER and Python depsPick a home, for example /home/USER/info_center:bash
+
+cd ~
+git clone https://github.com/DysfunctionalTechnologies/info_center.git
+cd info_center
+
+Or copy your working tree onto the Pi.Create a venv that can still see apt packages:bash
+
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install rpi_ws281x smbus2
+
+Why a venv: Raspberry Pi OS Bookworm/Trixie blocks system-wide pip (PEP 668).
+Why --system-site-packages: so python3-smbus2 from apt still imports.rpi_ws281x maps PWM/PCM/DMA and almost always needs root. The practical pattern on a dedicated display Pi:bash
+
+sudo .venv/bin/pip install rpi_ws281x smbus2
+
+or, if you accept the PEP 668 override on an appliance image:bash
+
+sudo pip3 install --break-system-packages rpi_ws281x smbus2
+
+Confirm imports as the same user you will run with:bash
+
+sudo python3 -c "from rpi_ws281x import Adafruit_NeoPixel, Color; print('rpi_ws281x OK')"
+sudo python3 -c "from smbus2 import SMBus; print('smbus2 OK')"
+
+INFO_CENTER’s RPI_WS281X.py uses the older Adafruit_NeoPixel name from that package. That import must succeed.8. Match CONFIG to the hardwareDefaults already match this build:strip_gpio = 21
+strip_freq = 800000
+strip_dma = 10
+strip_channel = 0
+panel 32×16, orientation 180
+globe 23 LEDs
+total 535
+
+If your strip is shorter, change DEFAULT_PANEL_WIDTH / HEIGHT / DEFAULT_GLOBE_LED_COUNT in CONFIG.py before first run. Driving 535 pixels into a 60-LED test strip will not hurt the Pi, but addressing will look wrong.Optional .platform file next to PLATFORM.py:
+
+GPIO_PIN=21
+PANEL_LAYOUT=16x16
+GLOBE_PUSH=0
+
+9. First run without errorsPower the LED supply. Then, from the project directory:bash
+
+cd ~/info_center
+sudo python3 INFO_CENTER.py
+
+If you used a venv:bash
+
+sudo ~/info_center/.venv/bin/python INFO_CENTER.py
+
+Success looks like: no traceback, panel clears, then INFO / CENTER splash, then the pattern loop. EEPROM load may log a warning on a blank chip; that is normal. The next save writes the V2 27-byte block at offset 0.Do not start with full white. Let the program use its default brightness.Stop with Ctrl+C. The main loop calls strip_cleanup().Use DIAGNOSTICS.py if you want isolated tests (panel fill, temperature reads) before leaving the main loop running:bash
+
+sudo python3 DIAGNOSTICS.py
+
+10. Quick hardware self-tests in PythonThese are useful screenshots for the user guide.EEPROM:bash
+
+sudo python3 - <<'PY'
+from smbus2 import SMBus
+bus = SMBus(1)
+print("EEPROM 0x57 byte0 =", bus.read_byte_data(0x57, 0))
+bus.close()
+PY
+
+Temperature (same path INFO_CENTER uses):bash
+
+python3 - <<'PY'
+import glob
+paths = glob.glob("/sys/bus/w1/devices/28*/w1_slave")
+print(paths)
+print(open(paths[0]).read() if paths else "NO SENSOR")
+PY
+
+Minimal LED blink on pixel 0 (GPIO 21, 8 pixels only — safe on a short test strip):bash
+
+sudo python3 - <<'PY'
+from rpi_ws281x import Adafruit_NeoPixel, Color
+import time
+s = Adafruit_NeoPixel(8, 21, 800000, 10, False, 32, 0)
+s.begin()
+s.setPixelColor(0, Color(32, 0, 0))
+s.show()
+time.sleep(2)
+s.setPixelColor(0, Color(0, 0, 0))
+s.show()
+print("LED OK")
+PY
+
+If this fails but I2C/1-Wire work, the problem is LED power, GND, GPIO 21, or the rpi_ws281x / root combination.11. Optional: start on bootCreate /etc/systemd/system/info-center.service:ini
+
+[Unit]
+Description=INFO_CENTER LED panel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/USER/info_center
+ExecStart=/usr/bin/python3 /home/USER/info_center/INFO_CENTER.py
+Restart=on-failure
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
+
+If using the venv, point ExecStart at .venv/bin/python.bash
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now info-center
+sudo journalctl -u info-center -f
+
+12. Troubleshooting table
+Symptom                Likely cause          Fix
+i2cdetect empty        I2C off, bad wiring,  Enable I2C, use 3.3 V VCC,
+                       5 V module confusing  check SDA/SCL
+                       the bus
+
+68 present but not UU  Overlay missing       dtoverlay=i2c-rtc,ds3231 in
+                                             /boot/firmware/config.txt,
+                                             reboot
+57 is UU               Kernel or another     Do not add an AT24 overlay;
+                       service claimed       leave 0x57 to userspace
+                       EEPROM
+
+EEPROM load warning    Blank or corrupt      Normal once; run the app
+every boot             chip                  so it save()s
+
+No 28-* device         No pull-up, wrong     4.7 kΩ, GPIO 4,
+                       GPIO, 1-Wire off      dtoverlay=w1-gpio
+
+Temp always 85 °C      Parasitic power /     Power VDD separately,
+                       clone / loose 3.3 V   shorter wires
+
+ModuleNotFoundError:   Installed in user     Python
+rpi_ws281x             venv, ran with 
+                       sudo system 
+Install for the interpreter you actually exec
+ModuleNotFoundError: smbus2
+Same mismatch
+sudo python3 -c "import smbus2"
+LEDs flicker / wrong colors
+3.3 V data into 5 V strip, missing GND, weak PSU
+Level shifter, common GND, inject 5 V
+Only first LED glitches
+No series resistor, long DIN wire
+330 Ω near the Pi, short data lead
+Pi reboots when LEDs turn on
+Strip powered from Pi 5 V
+Separate PSU
+Permission / mmap error from rpi_ws281x
+Not root
+sudo python3 INFO_CENTER.py
+Time resets to 2020/1970 offline
+fake-hwclock still winning
+Remove it; hwclock -w once while time is good
+
+13. Suggested documentation photos / checklist
+Capture these while you do it once;
+they become the user manual figures:
+- Imager customisation screen (SSH + Wi-Fi)
+- Pi 3B+ header with three harnesses labeled
+- Close-up of 4.7 kΩ on DS18B20
+- lose-up of 330 Ω + capacitor on the strip input
+- Separate LED PSU and the common-GND wire
+- i2cdetect -y 1 showing 57 and UU at 68
+- cat .../w1_slave with YES and t=
+- First INFO_CENTER splash on the matrix
+
+Operator checklist at the front of the user doc:
+- Image SD, enable SSH  
+- Update OS  
+- Enable I2C + 1-Wire + i2c-rtc,ds3231  
+- Wire power-off  
+- Confirm 0x57, 0x68/UU, 28-*  
+- hwclock -w  
+- Install rpi_ws281x + smbus2  
+- sudo python3 INFO_CENTER.py  
+- Enable systemd unit
+
+If you want, after tomorrow’s run I can turn this into a tighter README
+for the repo (parts list, pinout diagram in text, and a “known-good
+config.txt fragment”) once you tell me the exact OS image name and
+whether you used Desktop or Lite.
+
+RPi Expansion Board Wiring:
+
+########################################################################
+# So, according to the RPi documentation and my program, where are the #
+# various pins of devices connected to the RPi3B+?                     #
+#                                                                      #
+# - First, DS3231 - +3.3V, GND, SDA, and SCLK?                         #
+# - Then DS18B20 - +3.3V, GND, and DATA?                               #
+# - Finally - WS2812b LED strip - +5V, GND, and DIN (this we know to   #
+#   be GPIO 21, pin 40 on the expansion connector)  - GND would be pin #
+#   39, and +5V would be pins 2 & 4. And yes, I know not to try to     #
+#   power the 16x32 panel from the RPi3B+                              #
+########################################################################
+
+On a Raspberry Pi 3B+ 40-pin header, this is the mapping that matches
+both the official pinout and INFO_CENTER.
+
+Physical pin = the number stamped on the header.
+BCM GPIO = the number the software uses.
+
+DS3231 (I2C-1)
+DS3231       Physical pin  BCM     Notes
+VCC / +3.3V  1             —        Use 3.3 V, not 5 V. Pin 17 is also
+                                    3.3 V if pin 1 is taken.
+GND          6             —        Any GND works. 6 is next to SDA/SCL.
+SDA          3             GPIO 2   Fixed I2C1 SDA.
+SCL (SCLK)   5             GPIO 3   Fixed I2C1 SCL.
+SQW          —             unused   Leave open.
+32K          —             unused   Leave open.
+
+After the i2c-rtc,ds3231 overlay: RTC is 0x68 (usually shows as UU).
+EEPROM on the same module stays at 0x57 for EEPROM.py.
+
+Do not put the DS18B20 data line on pins 3 or 5. Those are the I2C pins.
+DS18B20 (1-Wire)INFO_CENTER reads /sys/bus/w1/devices/28-*. That is the
+kernel 1-Wire bus, default pin GPIO 4.
+
+DS18B20      Physical pin  BCM      Notes
+VDD / +3.3V  17            —        Pin 1 is also 3.3 V. Do not use 5 V.
+GND          9             —        Any GND. 9 is near pin 7.
+DATA / DQ    7             GPIO 4   Default dtoverlay=w1-gpio pin.
+
+Put a 4.7 kΩ resistor between DATA and +3.3 V.If you ever move DATA off
+GPIO 4, you must change the overlay, for example:
+    dtoverlay=w1-gpio,gpiopin=17.
+The Python code does not select the pin; the kernel does.
+
+WS2812B strip Matches CONFIG.py: strip_gpio = 21.
+WS2812B      Physical pin  BCM      Notes
+DIN          40            GPIO 21  PCM data out. This is the only Pi
+                                    pin that drives the strip.
+GND          39            —        Best Pi-side ground: it sits next to
+                                    pin 40. Tie this to LED-PSU negative
+                                    and strip GND.
++5V          not from the Pi  —
+
+Pins 2 and 4 are the Pi’s 5 V rail. Do not use them for a 16×32 panel.
+Feed strip 5 V from the external supply.
+
+Pins 2 and 4 are only listed so you know what they are. For this build
+they stay unused by the strip. A 330 Ω resistor goes in the DIN line
+near the Pi. A bulk capacitor goes across strip 5 V and GND at the strip
+input.
+
+Header picture in words
+
+Top row (odd pins), relevant bits:
+Pin 1: 3.3 V      → DS3231 VCC  
+Pin 3: GPIO 2 SDA → DS3231 SDA  
+Pin 5: GPIO 3 SCL → DS3231 SCL  
+Pin 7: GPIO 4     → DS18B20 DATA  
+Pin 9: GND        → DS18B20 GND  
+Pin 17: 3.3 V     → DS18B20 VDD  
+Pin 39: GND       → LED strip GND (common with LED PSU)
+
+Even row:
+Pin 2 / 4: Pi 5 V — do not power the panel from these  
+Pin 6: GND        → DS3231 GND  
+Pin 40: GPIO 21   → WS2812B DIN
+
+Three grounds (DS3231, DS18B20, strip) must all end up on the Pi GND net.
+The LED +5 V net stays on the external PSU only.
+
+########################################################################
+# I build expansion boards that plug onto the RPi expansion connector. #
+# The DS3231 is mounted on it, and there are 3pin connectors for the   #
+# temperature sensor and the LED strip. My other five RPis have my     #
+# expansion board already, this is number 6. Works well and gives me   #
+# some room for prototyping - like when we get the Temp/RH and         #
+# Barometric pressure modules.                                         #
+########################################################################
+
+That changes the documentation tone. For board #6 you are not teaching
+jumper-wire GPIO — you are documenting a known HAT pinout plus two 3-pin
+jacks.Keep the same electrical map, just describe it as the board
+already implements it:
+On the HAT (soldered)  DS3231 VCC → header pin 1 (3.3 V)  
+DS3231 SDA → pin 3 / GPIO 2  
+DS3231 SCL → pin 5 / GPIO 3  
+DS3231 GND → pin 6
+
+Temp 3-pin (wired on the PCB to the 1-Wire default)  +3.3 V → pin 17  
+DATA → pin 7 / GPIO 4  
+GND → pin 9  
+4.7 kΩ pull-up on the board between DATA and 3.3 V
+
+LED 3-pin  DIN → pin 40 / GPIO 21  
+GND → pin 39, and that ground must also bond to the external LED PSU  
++5 V on that connector should come from the external supply, not header pins 2/4
+
+That last point is the one to label on the silkscreen. People will
+assume a 3-pin LED jack is “Pi 5 V / GND / DATA.” If your LED +5 V pin
+is tied to pins 2/4, a 16×32 will brown the Pi out. If it is a separate
+5 V incoming from the PSU, say so on the board and in the manual.
+
+For the user guide, the live checklist shrinks to:
+Seat the HAT fully, pin 1 to pin 1.  
+Plug DS18B20 into the temp jack (match VDD / DATA / GND).  
+Plug strip DIN/GND into the LED jack; feed strip 5 V from the brick.  
+i2cdetect -y 1 → 57 and 68/UU.  
+ls /sys/bus/w1/devices/28-*.  
+Run INFO_CENTER.
+
+Future Temp/RH and barometer modules fit this board cleanly if they are
+I2C. Bus 1 is already live. Just leave these addresses alone:
+Address    Already used
+0x68       DS3231 RTC (kernel)
+0x57       AT24C32 EEPROM (INFO_CENTER)
+
+Good next-chip addresses:
+BME280/BMP280 at 0x76/0x77, BMP390 same, SHT3x at 0x44/0x45. Add another
+3-pin or 4-pin I2C header (3.3 V, GND, SDA, SCL) and you do not touch
+GPIO 4 or GPIO 21.
+
+If you want, the next doc section can be a one-page “Expansion board #6”
+sheet: connector pinouts, I2C address map, and a reserved-address list
+for the pressure/RH modules.
+

@@ -1,8 +1,8 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project: Info_Center_16x32
-# Version: V1.19
-# Date:    September 2, 2026
+# Version: V1.20
+# Date:    September 5, 2026
 # Module:  DATA_FETCHER.py
 # Author:  Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -85,8 +85,29 @@ def raise_alert(level, source=""):
                                       info_center.alert_low_until)
         info_center.alert_level = 2 if now < info_center.alert_high_until else 1
         info_center.alert_source = "live"
-    logger.info("Alert %s from %s", level, source or "?")
 
+        src = (source or "").lower()
+        item = None
+        if "heavy" in src:
+            item = ("WX", "HEAVY RAIN", "R")
+        elif "thunder" in src:
+            item = ("WX", "THUNDER", "Y")
+        elif "quake-major" in src or ("quake" in src and level >= 2):
+            item = ("QK", "QUAKE 6+", "R")
+        elif "quake" in src:
+            item = ("QK", "QUAKE 5+", "Y")
+        elif "fx-major" in src or ("fx" in src and level >= 2):
+            item = ("FX", "FX", "R")
+        elif "fx" in src:
+            item = ("FX", "FX", "Y")
+
+        items = list(getattr(info_center, "alert_items", []) or [])
+        if item and item not in items:
+            items.append(item)
+        info_center.alert_items = items
+        info_center.alert_nouns = [t for (_, t, _) in items]
+    logger.info("Alert %s from %s", level, source or "?")
+        
 def fetch_weather():
     url = (
         "https://api.open-meteo.com/v1/forecast"
@@ -447,6 +468,34 @@ def _extra_holidays(year):
         date(year, 12, 31): "NEW YEARS EVE",
     }
 
+def _norm_holiday(name):
+    s = str(name or "").replace("'", "").replace("’", "").strip().upper()
+    s = s.replace("LABOUR", "LABOR")
+    if s in ("", "HOLIDAY", "US HOLIDAY", "PH HOLIDAY"):
+        return ""
+    if s.startswith("US "):
+        s = s[3:]
+    if s.startswith("PH "):
+        s = s[3:]
+    return s
+
+def collect(cc):
+    out = []
+    data = _safe_get(
+        f"https://nagerholidays.com/api/v4/Holidays/{cc}/{year}",
+        timeout=10
+    )
+    if not isinstance(data, list):
+        return out
+    for h in data:
+        if str(h.get("date", ""))[:10] != today:
+            continue
+        raw = h.get("name") or h.get("localName") or ""
+        name = _norm_holiday(raw)
+        if name and name not in out:
+            out.append(name)
+    return out
+    
 def fetch_holidays():
     try:
         today = time.strftime("%Y-%m-%d")
@@ -463,8 +512,9 @@ def fetch_holidays():
             for h in data:
                 if str(h.get("date", ""))[:10] != today:
                     continue
-                name = str(h.get("name") or "HOLIDAY")
-                name = name.replace("'", "").replace("’", "").strip().upper()
+                # US official spelling lives in localName; name is often British
+                raw = h.get("localName") if cc == "US" else (h.get("name") or h.get("localName"))
+                name = _norm_holiday(raw)
                 if name and name not in out:
                     out.append(name)
             return out
@@ -484,12 +534,13 @@ def fetch_holidays():
         extra = _extra_holidays(int(year))
         today_d = date.fromisoformat(today)
         if today_d in extra:
-            raw = extra[today_d]
+            raw = _norm_holiday(extra[today_d])
             if raw.startswith("US "):
                 raw = raw[3:]
-            us_name = f"US {raw}"
-            if raw not in ph_names and us_name not in names and raw not in names:
-                names.append(us_name)
+            already = raw in ph_names or raw in us_names or raw in names
+            already = already or (f"US {raw}" in names) or (f"PH {raw}" in names)
+            if not already:
+                names.append(f"US {raw}")
 
         with info_center.lock:
             if names:
@@ -504,7 +555,7 @@ def fetch_holidays():
     except Exception as e:
         logger.warning("Holiday fetch error: %s", e)
         return False
-        
+                
 def _safe_get(url, timeout=12):
     try:
         req = urllib.request.Request(url, headers=_FETCH_HEADERS)
@@ -635,7 +686,9 @@ def start_data_fetcher():
 #----------------------------------------------------------#
 if __name__ == "__main__":
 #----------------------------------------------------------#
-    print("This module cannot be run directly.")
-    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py")
+    print("This module should not be run directly.")
+    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py\n")
+    from INFO_CENTER import main
+    main()
     exit(0)
 #----------------------------------------------------------#

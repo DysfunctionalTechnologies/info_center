@@ -1,38 +1,62 @@
-Resume INFO_CENTER V1.19 with Grok.
+INFO_CENTER + Globe — context for next sessionRepos / versions  GitHub: https://github.com/DysfunctionalTechnologies/info_center.git  
+Work tree on RPi5-1:
+/media/tscarlson/RPI_DEVELOPMENT_2TB/Engineering/Development/tscarlson@Clock/python_programs/Info_Center/Info_Center_16x32/Info_Center_16x32_V1.20  
+Branch V1.20 (do not treat as frozen V1.19 soak).  
+Globe landed in-tree: Globe/main.py, Globe/globe.py, Globe/speaker.py.  
+Commit adaa02a — “V1.20 Globe: CYD/TFT IPs, alert chirps only, speaker module”.  
+Globe/secrets.py is gitignored. Never commit Wi‑Fi secrets.  
+Many Pi modules are dirty locally and were not in that commit (CONFIG.py, WEB.py, GLOBE_LINK.py, etc.). Don’t assume GitHub V1.20 has the day’s Pi edits.
 
-Fleet / portals
-- Preface 210: or 214:. Same portal until a new preface.
-- 210 = RPi5-1 192.168.0.210 workshop. GLOBE_PUSH=0.
-- 214 = RPi4B-1 192.168.0.214 test + wireless globe. GLOBE_PUSH=1.
-- Globe TFT is 192.168.0.223 UDP 4210. Not .230.
-- Six systems running. User manual parked. EEPROM version bump parked until all new settings exist.
+Fleet  RPi5-1 workshop 192.168.0.210, GLOBE_PUSH=0  
+RPi4B-1 test + wireless globe pusher 192.168.0.214, GLOBE_PUSH=1  
+CYD globe 192.168.0.223 UDP 4210 (not .230)  
+Same portal until a new preface. Six systems up. User manual and EEPROM bump parked unless we reopen them.
 
-Done
-- Globe push persists: CONFIG already lets .platform win on boot; WEB /set_globe_push writes save_platform and save_persisted; GLOBE_LINK sendto uses globe_host().
-- WEATHER scroll label HUM: → RH:.
+Globe hardware / firmware (V1.20 on CYD, MicroPython)  ESP32-2432S028 CYD, Thonny on 210, interpreter MicroPython (ESP32).  
+Files: main.py (Wi‑Fi, UDP JSON, seq/boot stale check, 60 s failsafe → OFF), globe.py (TFT + 23-LED WS2812 bitstream GPIO 27, SoftSPI TFT), speaker.py (PWM GPIO 26).  
+LED_N still 23 in firmware; physical stand is 21 LEDs for now.  
+TFT is bench-only. Final product may have no TFT. Small color disc top-right; IPs on the left.  
+Boot: CYD <sta ip> immediately, PI -- until first good packet, then PI 192.168.0.214.  
+set_master(addr) before set_mode or the label stays -- until a mode change.  
+Modes: GREEN all-good, BLUE untested, YELLOW some issues (R+G), RED net looks dead, FLASH_YELLOW / FLASH_RED / FLASH_RYK alerts, OFF failsafe.  
+FLASH_RED/YELLOW ~50% duty. FLASH_RYK R→Y→black rotate.  
+Chirp only on FLASH_* (== not in ("FLASH_YELLOW") — that substring bug chirped on idle YELLOW).  
+Intro chirp on CYD power-on/RST is spec’d, not necessarily coded as a separate boot phrase beyond existing self_test().  
+Thonny Stop/REPL kills main.py. RST the CYD to run again. Close Thonny or leave REPL so it doesn’t sit halted.
 
-In progress — FX / money model (do not invent Panel 1/Panel 2)
-- One PRIMARY per machine (Tim USD, wife PHP). SECONDARY is for the FX scroll only. WEB note: “for exchange rate only”.
-- FX scroll: 1USD = 62.64PHP  no space after numbers. Cyan: 1 and the rate. White: USD, =, PHP.
-- Oil and all other money: PRIMARY only. No $xx/Pxx dual prices.
-- Fetch once: open.er-api.com/v6/latest/USD then
-  usd_to_primary, usd_to_secondary, pair_rate = usd_to_secondary/usd_to_primary,
-  oil_in_primary = usd_price * usd_to_primary.
-- Invalid code (YEN is wrong; JPY is yen): that code RED, do not rebuild/clear every frame (that flash was need_rebuild including not fresh).
-- Pair is RAM only until EEPROM bump. Reboot returns to USD/PHP.
+Pi ↔ globe (today)  Unicast JSON to one GLOBE_HOST (.223). No broadcast.  
+Packet already has cmd/mode/seq/boot.  
+No TOKEN, FILTER, CHIRP flag, BRIGHT, HHMM, or RESET field in firmware yet.
 
-Files touched / to finish
-- WEB.py set_globe_push already patched. Need /set_exchange_pair + status keys exchange_base/quote (will become primary/secondary).
-- WEB_html.py FX boxes added; labels should become PRIMARY / SECONDARY.
-- EXCHANGE.py converting from dissolve to scroll (weather-style continuous_scroll_message).
-- DATA_FETCHER.fetch_exchange still must be rewritten to the PRIMARY model and must not feed oil from the pair rate.
-- OIL.py _fmt_price must stop using exchange_rate; use usd_to_primary.
-- CONFIG: primary, secondary, usd_to_primary, pair_rate. ExchangeDisplayState needs msg/colors/last_built.
+Spec parked (Pi master, globe slave) — do not invent CYD policy  GLOBE_HOSTS list in .platform only (legacy GLOBE_HOST = first). No extra hosts file.  
+Per-host: name, schedule filter ALL / BADNET / ALERTS, CHIRP default on if key missing, brightness / optional auto day-night.  
+Pi always sends live mode; globe obeys filter on the packet. Quiet = black idle, alerts still flash.  
+Packet extras when we implement: MODE, FILTER, CHIRP, BRIGHT, HHMM, RESET, TOKEN.  
+Chirp default on so the feature is discoverable. Mute is opt-out.  
+Boot/hard-reset intro chirp on the CYD even if alert chirp is off.  
+USB plug-in pairing (not LAN handshake, not 60 s marriage): plug globe into that Pi, serial exchange IP+token+name+LED count, TFT GREEN, Pi appends to GLOBE_HOSTS. Plug into another Pi → globe overwrites partner. Old Pi shouts into the ether. Pi drops a host after 30 days with no beacon (vacation-safe). List size is irrelevant.  
+Secret/token in packet later; source IP is display-only. Unpaired bench mule may accept anyone until we lock that.  
+Discovery beacons optional after USB pair exists.  
+Wired living-room globe may need its own brightness (don’t apply_brightness() those LEDs with the 512 panel).
 
-Still queued after money works
-- Oil currency as a separate idea is obsolete — primary covers it.
-- USER checkboxes: PACMAN, EXCHANGE, WEATHER, EARTHQUAKE. INTERNET MONITOR always on.
-- Later TECH: local RH / barometer when modules arrive. Then weather scroll variants.
-- Then one EEPROM V3 for: globe already stored; primary/secondary; pattern enables; oil no longer needs a currency enum.
+Pocket — poke if not done in a day or two  USB wizard current table: CYD floor, BLUE, GREEN, YELLOW (live worst steady), FLASH_RED, FLASH_RYK, each at more than one brightness. Globe and 512-panel. Volts + amps. No white mode required.  
+18650 + cheap boost ~2 h mostly GREEN then brownout is expected; “2.4 A” modules lie; charger path is another clamp.
 
-Do not: dual identity on one WEB UI; dual FX or dual oil on the matrix; persist new fields until the grouped EEPROM bump.
+Dev machine notes (210, not Info Center)  Thonny 4.1.7 on 210 vs 4.1.4 on 214; both Wayland/labwc.  
+Thonny has no overwrite/Insert; keypad . = Delete via user xkb:
+~/.config/xkb/symbols/custom + rules/evdev option kpdel:kpdel,
+XKB_DEFAULT_OPTIONS=kpdel:kpdel in ~/.config/labwc/environment.  
+Don’t re-open that unless it regresses.
+
+Do not start with  Voice-chat restoration  
+User manual / EEPROM bump unless asked  
+Broadcast UDP  
+Menu minefield on the CYD
+
+Sensible next slices  Confirm 214 still drives .223 after a clean RST (IPs on TFT).  
+GLOBE_HOSTS loop in GLOBE_LINK.py (unicast list).  
+Or globe_pair.py USB ceremony.  
+Or power-measurement table.
+
+Sunday was bird/clean day; user may still be tired. Don’t dive so deep we miss breaks.
+

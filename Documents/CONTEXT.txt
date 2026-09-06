@@ -1,0 +1,58 @@
+CONTEXT — Info_Center_16x32 resume (paste this first tomorrow)
+Project: Info_Center_16x32.
+Author Timothy S. Carlson + Grok.
+Site: San Miguel, Bulacan, PH.
+Hardware: 16×32 WS2812b panel + 23-LED globe (GPIO 21), DS3231+AT24C32
+          (I2C1 0x68/0x57), DS18B20.
+Wireless globe: ESP32-2432S028 (CYD) at 192.168.0.43:4210 UDP.
+
+Do not rewrite architecture. Singleton info_center in CONFIG. Pattern
+table + LOOP_START in INFO_CENTER. Dirty-flag strip (set_pixel /
+update_strip). EEPROM v2 27 bytes (not JSON). Pi is source of truth.
+Globe LEDs full brightness (no panel dim). One fix group at a time.
+
+V1.16 tagged (done)
+- Nager PH holidays.
+- White moon / yellow sun (glyphs 134–137).
+- RPI_WS281X.py + ws281x_pio.c/.so + ws2812.pio.h.
+  Pi 4 = PWM/DMA rpi_ws281x.
+  Pi 5 = RP1 PIO on GPIO 21 (/dev/pio0, libpio0).
+  PANEL uses create_strip(). Both Pis proven.
+- EEPROM v2 save/load proven on both.
+
+V1.17 in progress (tested tonight, commit when fresh)
+- GLOBE_LINK UDP JSON includes "boot": os.getpid() and seq.  
+- CYD main.py already drops last_seq on new boot and on 60 s failsafe;
+  failsafe paints OFF/black.  
+- EEPROM flag bit3 FLAG_GLOBE_PUSH (0x08), still v2/27 bytes.  
+- CONFIG loads globe_push_enabled. DATA_FETCHER _save_persisted writes
+  it. WEB route_set_globe_push calls _save_persisted().  
+
+Proven:
+Push ON persists across Info Center restart; CYD blacks at 60 s; new
+process resumes without CYD power cycle.
+
+Do not reopen unless asked
+Oil Monday fake ticks.
+WEB HTML rewrite.
+FLASH_MS/RYK_MS.
+CYD globe.py bitstream.
+Architecture.Parked / later
+
+Optional:
+- send boot also as a wall-clock if pid reuse ever bites (it didn’t
+  tonight).
+- Confirm version_string is V1.17 on the copyright pattern.
+- Pi 4 regression of the bit3 EEPROM flag if you care before tagging.
+
+Key paths
+- Dev disk: .../Info_Center_16x32_V1.16/ (branch is 1.17 in tree).
+- CYD: Info_Center_Globe_23_LEDs_(CYD)_V1.02/ — Thonny on Pi 5; don’t
+  use stale sidebar paths.
+- Charge-only USB-C cables exist; REPL needs a data cable + MicroPython
+  ESP32 port.
+  
+Resume order
+- Commit V1.17 (CONFIG/EEPROM/DATA_FETCHER/WEB/GLOBE_LINK + CYD main if
+  flashed).  
+- Only then pick a new slice.

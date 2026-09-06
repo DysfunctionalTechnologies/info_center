@@ -1,0 +1,592 @@
+Solar power is one of the fastest-changing energy technologies on Earth.
+The basic idea is simple: photovoltaic (PV) cells convert photons into
+electricity. What’s not simple is how far the industry has come in a
+decade.
+
+Where things stand now
+The world passed 3 terawatts of installed solar capacity in early 2026.
+It took decades to reach the first terawatt and only a few years to
+triple that. In 2025 the industry added on the order of 600+ GW in a
+single year (estimates vary by source, commonly cited around 510–664 GW).
+Solar now supplies about 9–10% of global electricity, and on an average
+day in the first half of 2026 it met over a quarter of world demand at
+midday. 
+
+ember-energy.org
+
+China still dominates both manufacturing and new installations (often
+more than half of annual additions). India, the US, the EU, and Brazil
+are the next large markets. 2026 is expected to be the first year in two
+decades with a modest drop in new installations—mostly because of policy
+changes in China—not because solar got worse.
+
+Why it exploded
+- Costs collapsed. Utility-scale solar’s global average LCOE has been
+  around $44/MWh recently, after falling ~90% since 2010. In many sunny
+  regions, new solar is cheaper than new coal or gas, and in some cases
+  cheaper than running existing coal plants. Commercial silicon modules
+  now routinely exceed 24% efficiency. Lab perovskite–silicon tandem
+  cells have reached ~35.5%. 
+
+irena.org
+
+The real constraint is no longer “is it cheap?” - It’s integration:
+Solar is a midday resource. Without storage or flexible demand, evenings
+still belong to other generators. Battery costs have also fallen
+dramatically (global averages around $140/kWh installed by 2025). 2026
+battery additions are large enough that they could shift a much bigger
+share of new solar into evening hours. Grids, interconnection queues,
+silver in cells, land use, recycling of old panels, and manufacturing
+overcapacity are the live issues.
+
+Two main families of solar:
+PV (almost everything being built): silicon, increasingly TOPCon /
+n-type, plus emerging tandems.
+
+Concentrated solar power (CSP): mirrors + heat, useful where you want
+thermal storage, but far smaller in new capacity.
+
+What do you want to dig into—how the cells work, costs and markets,
+storage pairing, rooftop vs utility-scale, new tech like perovskites,
+environmental tradeoffs, or something more specific like home systems or
+ a particular country?
+
+I live in Bulacan, Philippines. I own my house. It is a 8mx12m two story
+(2nd story is only half). The roof slopes east/west. My electric bill is
+p9000+ a month. I want brownout / bad Meralco power protection. I do NOT
+want to feed back into the grid. I work at night, with multiple
+computers, while my wife and daughter sleep in a 4mx4m bedroom with
+aircon. I have 220-230VAC, 30A service.
+
+What do I need for a nice solar setup.
+
+I’ll size this around your roof, night-heavy load, and no-export +
+brownout backup — first I need local rates, sun hours in Bulacan, and
+what ₱9,000/month actually means in kWh.You want a hybrid system that
+never exports, keeps the bedroom AC and your night work running through
+brownouts, and lives within a 30 A / 230 V service. That is a specific
+design, not a generic “go solar” kit.At ~₱14.78/kWh, a ₱9,000+ bill is
+roughly 600–650 kWh/month, or about 20–22 kWh/day. 
+
+manilatimes.net
+
+What “nice” means for your house
+Goal                        What to buy
+No feed-in to Meralco       Hybrid inverter + zero-export CT at the main
+Brownouts / dirty grid      Hybrid with EPS/UPS output (<20 ms)
+                            + LiFePO₄ battery
+Night work + bedroom AC     Battery sized for 8–10 hours of those loads
+East/west roof              Two MPPT inverter, split array
+30 A service                Inverter and grid-charge limits that won’t
+                            trip the main
+
+Do not get a plain grid-tie inverter. When Meralco dies, those shut off.
+You also do not want net metering if you refuse export.Loads you should
+design around 4×4 m bedroom (16 m²)
+
+A 1.0 HP inverter split-type is the right size. After the room is cold
+it often sits around 400–700 W. Overnight (8–10 h) that is about 4–7 kWh.
+A non-inverter 1.0–1.5 HP will wreck the battery math. If the AC is old,
+replace it first. 
+
+solarstreamph.com
+
+Your night desk
+Two desktops + monitors can be 400–800 W. Laptops cut that a lot. Count
+4–6 kWh if you work a full night. Always-on Fridge ~1–1.5 kWh/day,
+router, lights, fans: another 2–3 kWh.
+
+Critical night package (what the battery must carry in a brownout):
+- Bedroom AC  
+- Work computers + Wi-Fi  
+- Fridge  
+- Lights / phone charge
+
+Plan on ~1.5–2.0 kW running, 10–14 kWh for a full night. That is the
+number that matters more than “cover the whole ₱9,000 bill.”Daytime
+laundry, extra AC, water heater can stay on the grid-only side.
+
+Recommended system
+Architecture: hybrid inverter, solar charges batteries and the house,
+              grid only fills gaps, export locked at 0 W.1.
+
+Panels:       8–10 kWpIn Luzon, sales talk of “5 sun hours.”
+              Real installed systems in the Philippines have been closer
+              to ~3.6 kWh per kW per day after heat, dirt, rain, and
+              wiring losses. 
+
+8 kWp → about 22–32 kWh/day (rainy vs dry)  
+10 kWp → about 28–40 kWh/day
+
+You need extra watts because:
+    Roof faces east and west, not south (good spread through the day,
+    a bit less noon peak)  
+Unused midday power is wasted if the battery is full (no export)  
+June–October is cloudy
+
+Roof: 8×12 m footprint is 96 m²; half second storey adds more plane. A 550–600 W module is ~2.3 × 1.1 m. 14–18 panels (8–10 kWp) fit easily if you use both slopes and keep water tanks / trees off the array. Mount east string on east face, west string on west face. Ideal tilt in Bulacan is about 14° south; on an E/W roof, follow the existing pitch and don’t force a weird tilt unless an engineer says the structure can take it.Use N-type / TOPCon 550–600 W, typhoon-rated rails, mid/end clamps, proper grounding and DC surge protection. Bulacan gets typhoons; cheap L-feet on a GI roof are how systems fly.2. Inverter: 6–8 kW single-phase hybridYour service is 30 A ≈ 6.9 kW. A 6 kW hybrid is the safest match. An 8 kW unit is nicer for AC + computers together if the installer sets grid-input / charge limits so you don’t trip the 30 A main.Must-have features:Two MPPTs (east + west)  
+Zero export via CT or meter at the service entrance  
+Backup/EPS output, fast transfer  
+48 V LiFePO₄ support (CAN/RS485)  
+App monitoring
+
+Common in PH: Deye / Sunsynk, Sungrow SH-RS, Growatt SPH, Solis hybrid. Deye/Sunsynk and Sungrow are the usual “this actually works in a brownout” picks. Avoid no-name ₱20k inverters for a house you sleep in. 
+
+lakasolar.ph
+
+3. Battery: 15–20 kWh LiFePO₄Bank
+Usable (~90%)
+What it does
+10 kWh
+~9 kWh
+AC or work computers, not both all night
+15 kWh
+~13.5 kWh
+AC + light work through most nights
+20 kWh
+~18 kWh
+Full night AC + desktops, plus a cloudy-day cushion
+
+Get 15 kWh minimum; 20 kWh if the budget allows. Chemistry: LiFePO₄ only (Pylontech, Dyness, BYD, Sungrow SBR, or a good rack equivalent). 6,000+ cycles. Lead-acid is a false economy in this climate.That bank is for your night + outages, not for running the whole house off-grid for days.4. Electrical layout (this is the “nice” part)Have the electrician build a critical-loads subpanel fed from the hybrid backup output:Bedroom AC  
+Work room receptacles  
+Fridge  
+Router / lights you care about
+
+Everything else stays on the main Meralco panel. During a brownout the inverter is not asked to run the whole house.Also:Zero-export CT on the main incoming hot, not after a subpanel  
+SPD on AC and DC  
+Changeover / grounding done to PEC  
+Inverter grid charge current capped (often 20–30 A) so battery charging + house load cannot exceed 30 A
+
+If the 30 A main already feels tight, a service upgrade to 60 A is a better long-term move than oversizing the inverter.Ballpark cost in the Philippines (installed, 2026)These are market ranges, not a quote:8–10 kWp panels + mounting: ₱120k–180k  
+6–8 kW hybrid: ₱55k–95k  
+15–20 kWh LFP: ₱200k–350k  
+Wiring, critical panel, protection, labor, permits: ₱80k–150k
+
+All-in: about ₱550,000–₱850,000.
+Batteries are half the bill. A 5 kW hybrid with a small battery is cheaper and will not cover overnight AC. 
+
+pinas.solar
+
+Payback is slower than export/net-metering systems because you throw away surplus sun. You are paying for uptime and dirty-grid isolation, not maximum peso ROI.What this will and will not doWillCut a large share of the daytime bill  
+Run bedroom AC + your PCs through typical Meralco interruptions  
+Ignore voltage sags better than a cheap AVR  
+Never push power back to the grid if commissioned correctly
+
+Will notZero the ₱9,000 bill (night load is large; rainy weeks need the grid)  
+Carry a 3-day typhoon blackout at full comfort unless you add more battery or a small generator inlet  
+Let you add a second whole-house AC on backup without a bigger inverter and service upgrade
+
+Do these before you pay a depositPhoto the roof (both slopes), main panel, and meter. Confirm it is really 30 A.  
+Note AC brand/HP and whether it is inverter.  
+List night watts: PCs, monitors, fridge.  
+Get two written quotes that specify: kWp, inverter model, battery kWh/brand, zero-export, critical-load panel, and typhoon mounting.  
+Ask them to show the export-limit setting and where the CT goes.  
+LGU electrical permit still matters even with no net metering.
+
+If you tell me the AC HP (and inverter or not), how many desktop PCs, and whether the half-second-storey sits on the east or west side, the panel count and battery size can be tightened instead of the 8–10 kWp / 15–20 kWh band.
+
+Sun hours are 6am to 6pm, average per year.
+We have rainy season (we are in it right now) were it rains constantly for days, or even weeks.
+Our aircon is new, 1hp, split inverter type.
+I don't mind if the Meralco charges the battery or provides power at times.
+I do have small roofs to the south (covered side patio and our front patio).
+The front patio roof that faces the south covers a 4m x 4m patio area.
+The side patio covers 10m x 1m
+
+South-facing patio roofs change the array layout, and “grid can charge the battery” changes how much storage you actually need in weeks of rain. I’ll tighten the design around those two points.Those details change the layout more than the battery size.Because you are fine with Meralco topping up the battery, you do not need a week of rainy-season autonomy. The battery is for brownouts + moving some daytime sun to night. In a week of habagat rain, solar may only make 10–25% of a clear day. The grid covers the house and can keep the battery at a set reserve (for example 40–60%) so a brownout still leaves you with AC and computers. 
+
+solarinstallph.com
+
+“6am–6pm sun” is clock time, not peak-sun hours. In Bulacan the useful energy is still about 3.5–4.5 equivalent full-power hours on an average day, less in August.Aircon (this is the easy part)A new 1.0 HP inverter split in a 4×4 m room is almost ideal. After it pulls the room down, night draw is often 350–600 W. Ten hours is about 4–6 kWh. That is one battery module’s job, not a 20 kWh bank by itself.Night package to plan for:Load
+Typical night energy
+1 HP inverter AC, 8–10 h
+4–6 kWh
+Multiple computers
+3–6 kWh
+Fridge + router + lights
+2–3 kWh
+Total
+9–15 kWh
+
+Roofs: use the south patio firstSouth is the best plane you have (near the ~14° optimum for Bulacan). East/west main roof is still the bulk of the watts.Front patio ~4 m × 4 m (south)
+A common 550–600 W panel is about 2.27 m × 1.13 m. On a 4×4 plane you usually get 3 large panels (about 1.7–1.8 kWp) or 5–6 shorter 430–460 W panels (about 2.2–2.7 kWp). Put this string on its own MPPT. It will be your most productive watts per panel.Side patio 10 m × 1 m
+Standard panels are 1.13 m wide. They will not sit cleanly on a 1 m strip. Skip it unless you use small 150–200 W modules (~0.67 m wide). Even then you only pick up ~1 kW and add extra rails and wiring. Treat it as optional, not core.Main house, east/west slopes
+This is where 6–8 kWp should go, split east string / west string. East helps morning; west helps your pre-night battery charge.Target array: 8–10 kWp total~2–2.5 kWp south patio  
+rest split east/west on the house
+
+On a decent day that can make 25–35 kWh. In a hard rainy week it may make 5–12 kWh/day. That is why grid assist matters.What to buy (updated)Same architecture as before: hybrid, zero export, grid may charge.Inverter: 6 kW hybrid if you want to stay safely inside 30 A. 8 kW only if the installer caps grid charge current so main + charging cannot trip 30 A. Two or three MPPTs (south + east + west). Zero-export CT at the meter. Backup output to a critical-loads panel.
+Battery: 15 kWh LiFePO₄ is the sweet spot now.  Covers AC + work + fridge for a night  
+Leaves a reserve if Meralco dies at 2am  
+Grid can refill it during multi-day rain
+20 kWh is nicer if the budget is there; it is comfort, not a requirement, once grid charging is allowed.
+Do not buy 40 kWh “for rainy season.” You would be paying for energy you can buy from Meralco whenever the grid is up.
+
+Inverter settings to tell the installerExport = 0 W  
+Grid charging = ON  
+Minimum backup reserve = 40–50% (never flatten the battery on a normal night)  
+Charge from grid when battery is below that reserve or when a typhoon is coming  
+Critical panel: bedroom AC, work outlets, fridge, router, selected lights
+
+Mounting: typhoon rails on all three roofs. Patio roofs are often lighter structure — have them check if the 4×4 canopy can take ~80–150 kg of panels + rails plus wind uplift. If the patio is thin gauge, reinforce or keep panels on the house only.
+
+What a week of rain looks likePanels trickle; house runs on Meralco  
+Battery sits at reserve, ready for a brownout  
+You still save some daytime kWh on gray days, just not ₱9,000-worth  
+Dry season (Feb–May) is when the bill drops hard
+
+That is the correct PH hybrid behavior. Off-grid-for-a-week would mean a generator or a much larger bank.Still the right “nice” package8–10 kWp panels (south patio + E/W house)  
+6–8 kW hybrid, zero export, grid charge enabled  
+15 kWh LFP (20 kWh if you want extra night headroom)  
+Critical-loads subpanel  
+Expect installed ₱550k–₱800k depending on battery brand and patio structure work
+
+If you can measure the front patio roof actual length/width and say whether it is a solid GI/concrete slab or a thin canopy, the south string can be counted in exact panel quantity.
+
+The office has: 1 laptop, 4 RPi systems with monitors, and a 3D printer. Plus a fan. And lots of LEDs (I develop LED stuffs and toys and nik-naks)
+
+That office is not “a laptop.” It is a real night load, but still smaller than the aircon unless the 3D printer and LED bench stay on for hours.Realistic watt budgetItem
+Typical running watts
+Notes
+Laptop
+30–65 W
+Peaks a bit while charging
+4× Raspberry Pi
+25–60 W
+Pi 4 is low; Pi 5 is hungrier
+4× monitors
+40–120 W
+Small screens at the low end; 24" at the high end
+Desk fan
+15–60 W
+DC/inverter fans are much kinder
+3D printer, idle / printing
+50–120 W
+After the bed is hot
+3D printer, heating bed + nozzle
+150–300 W
+10–20 minutes, then it drops
+LED work (strips, toys, PSUs)
+50–300 W
+This is your wildcard
+1 HP inverter AC (already cooled)
+350–600 W
+Still the largest single load
+Fridge (average)
+80–150 W
+Cycles
+
+A normal work night (AC + Pis + monitors + laptop + fan + modest LED testing, printer off or already up to temp):About 0.8–1.4 kW running  
+8–10 hours → 7–12 kWh
+
+A heavy night (AC + printer heating/printing + a lit LED bench):About 1.3–2.0 kW  
+8–10 hours → 12–18 kWh
+
+The Pis are cheap. The monitors are moderate. The printer heat and the LED bench are what decide whether 15 kWh is comfortable or tight.What this does to the solar designNothing changes on the roof: 8–10 kWp, south patio first, east/west on the house, zero export, grid may charge.Battery:15 kWh LiFePO₄ is still the right default if the 3D printer is occasional and the LED bench is not a 200 W all-night light show.  
+20 kWh if you regularly print overnight and keep the AC on and leave test LEDs burning. That extra 5 kWh is basically “printer + bench insurance.”
+
+Inverter:6 kW hybrid still covers this. Start-up of the AC compressor plus a printer bed heater at the same time is the only surge to watch. A decent 6 kW hybrid handles that; an 8 kW unit has more headroom if the 30 A main is managed.
+
+Put on the critical-loads panel:Bedroom AC  
+Office room outlets (laptop, Pis, monitors, printer, fan)  
+Fridge  
+Router
+
+Keep high-power LED burn-in / big PSU tests on a shedable outlet. In a long brownout you want sleep + work + fridge, not a 200 W light-toy marathon.One thing you should do this weekBuy a plug power meter (₱300–800). Measure:Whole office strip for an hour of normal work  
+3D printer from cold start through a print  
+LED bench at the brightness you actually use
+
+You develop LEDs, so you already think in watts. Those three numbers remove the guesswork. If the office strip sits under 300 W without the printer, 15 kWh is plenty. If the bench alone is 150 W+ for hours, budget 20 kWh or agree that the bench goes off when Meralco dies.Grid charging still covers multi-day rain. You are sizing storage for one bad night, not for August.
+
+BOM and prices on the system I need, please.
+
+I’ll pull current Philippine retail/installer prices and put a complete BOM together for the 8–10 kWp hybrid + 15 kWh setup we sized.Prices below are Philippine mid-2026 installer / authorized-dealer ranges, VAT-ish retail, not the cheapest Shopee listing. A turnkey installer will bundle and mark these up. Treat this as a shopping list to compare quotes against, not a store invoice. 
+
+pinas.solar
+
+Recommended package: 9.3 kWp · Deye 8 kW 3-MPPT hybrid · 15.4 kWh LFP · zero export · grid may chargeA. GenerationQty
+Item
+Spec
+Unit (₱)
+Total (₱)
+16
+N-type TOPCon module
+Jinko / LONGi / JA / Trina 580 W, 25-yr
+9,000–11,500
+144,000–184,000
+
+Array = 9.28 kWp
+
+4
+Extra 430–460 W modules (optional)
+shorter format for 4×4 south patio if 580 W won’t fit 2 rows
+7,500–10,000
+30,000–40,000
+
+Layout: 3–6 pcs south patio (own MPPT), rest split east / west on the house. Skip the 10×1 m side strip.B. Inverter and storageQty
+Item
+Spec
+Unit (₱)
+Total (₱)
+1
+Hybrid inverter
+Deye SUN-8K-SG06LP1-EU-CM3 (or SG05), 8 kW, 3 MPPT, 48 V, EPS, zero-export CT
+63,000–72,000
+65,000–72,000
+1
+Zero-export CT / meter
+included with many Deyes; buy extra if not
+1,500–4,000
+1,500–4,000
+3
+LiFePO₄ battery
+Dyness DL5.0C or Pylontech US5000, 51.2 V 5.12 kWh each
+55,000–75,000
+165,000–225,000
+1
+Battery cables + lugs
+2/0 or 70 mm², 50–80 cm pairs, 200 A class
+lot
+4,000–8,000
+1
+Battery rack / wall brackets
+3-module stack or rack
+3,000–8,000
+3,000–8,000
+
+Bank = 15.36 kWh (~13.8 kWh usable). Add a 4th module later (~₱55–75k) if overnight 3D printing + LED bench is daily. 
+
+facebook.com
+
+Safer 30 A service option: same BOM with Deye 6 kW (₱48,000–55,000) and cap grid-charge current.C. Mounting (typhoon, GI roof + patio)Qty
+Item
+Spec
+Unit (₱)
+Total (₱)
+18–22
+Aluminum rail 2.4 m
+6005-T5
+1,200–1,800
+22,000–40,000
+40
+Mid clamps
+30–35 mm frame, SS hardware
+35–80
+1,400–3,200
+16
+End clamps
+same
+35–80
+560–1,280
+40
+L-feet / roof anchors
+stainless, EPDM
+60–220
+2,400–8,800
+8
+Rail splices + grounding lugs
+
+80–200
+640–1,600
+1
+Flashing / seal tape
+patio + house penetrations
+lot
+2,000–4,000
+
+Mounting subtotal: ₱30,000–60,000 (patio reinforcement extra if the 4×4 canopy is thin).D. DC / AC protection and wireQty
+Item
+Spec
+Total (₱)
+80–150 m
+PV wire 4 mm² or 6 mm², red+black, UV
+8,000–18,000
+
+16 pr
+MC4 connectors (genuine Staubli-type)
+1,200–2,500
+
+3
+DC MCB 2P 16–20 A, 1000 V
+2,000–3,500
+
+1
+DC isolator / combiner
+2,500–5,000
+
+1
+DC SPD Type 2, 1000 V
+2,000–3,500
+
+1
+AC isolator 40–63 A 2P
+1,500–3,000
+
+1
+AC MCB 40 A 2P (inverter output)
+400–800
+
+1
+RCCB 40 A 30 mA 2P
+1,800–3,500
+
+1
+AC SPD Type 2
+1,500–3,000
+
+1 lot
+THHN 8.0 / 5.5 mm², conduit, glands
+8,000–15,000
+
+2
+Ground rods 5/8" × 2.4 m + 8–10 mm² Cu
+2,500–4,500
+
+1
+Critical-loads subpanel 8–12 way + breakers
+6,000–12,000
+
+1
+Main-panel work / CT mounting at service
+2,000–5,000
+
+BOS electrical subtotal: ₱40,000–80,000E. Labor, permits, commissioningItem
+₱
+Design, PE/REE electrical plan (LGU)
+8,000–20,000
+Install labor (roof + electrical), Bulacan
+50,000–90,000
+LGU electrical permit / inspection
+3,000–10,000
+Commissioning, zero-export test, app setup
+5,000–10,000
+Contingency 5–8%
+20,000–40,000
+
+No Meralco net-metering fee if you truly never export. Still get a licensed electrician; a hybrid on a 30 A service is not a weekend DIY.Totals
+Equipment only
+Installed turnkey
+15 kWh system (recommended)
+₱460,000–640,000
+₱580,000–820,000
+Add 5 kWh (20.5 kWh bank)
++55,000–75,000
++60,000–85,000
+6 kW inverter instead of 8 kW
+−15,000–20,000
+−15,000–20,000
+
+Installed hybrid jobs of similar size in PH have been landing around ₱45k–₱68k per kWp when a ~15–16 kWh battery is included. Your design sits in that band. 
+
+pinas.solar
+
+What to tell three installersAsk each for a line-item quote matching this list:16 × 580 W Tier-1 (brand named)  
+Deye 8K 3-MPPT or named equivalent, export = 0 W, grid charge ON, backup reserve 40–50%  
+3 × 5.12 kWh named LFP, CAN to inverter  
+Critical-load panel: bedroom AC, office, fridge, router  
+Typhoon mounting + DC/AC SPD  
+CT at the main incoming hot  
+Grid charge current limited so you do not trip 30 A
+
+Walk away from a lump-sum “8 kW package ₱399,000” with no battery brand and no zero-export CT.If you want, next message can be a one-page spec sheet you can paste into Messenger when you request quotes.
+
+Copy everything below the line into Messenger / email.RFQ — Hybrid solar (zero export) — Bulacan residencePlease quote line-item, branded equipment, installed. No lump-sum “package” without models.SiteOwner-occupied house, Bulacan, Meralco
+Service: 220–230 VAC, single-phase, 30 A main
+Roof: house slopes east / west; south front patio ~4 m × 4 m; side patio 10 m × 1 m (likely unused — too narrow for standard modules)
+Do not export to the grid. Grid may supply the house and charge batteries.
+Goal: cut the ~₱9,000/mo bill, keep power in brownouts / bad voltage
+
+Critical loads (backup panel)Bedroom 1.0 HP inverter split AC
+Office: 1 laptop, 4× Raspberry Pi + monitors, 3D printer, fan, LED workbench (shedable)
+Fridge, router, selected lights
+
+Non-critical: stay on main Meralco panel (laundry, extra outlets, etc.)Must-have systemPV: ~9.3 kWp — sixteen (16) Tier-1 N-type / TOPCon ~580 W (Jinko / LONGi / JA / Trina or equal). South patio on its own MPPT; remainder split east / west.
+Inverter: Deye SUN-8K-SG06LP1-EU-CM3 (or SG05 3-MPPT equal). 8 kW, 48 V, EPS/UPS backup.
+Alternate if you prefer to stay safer on 30 A: Deye 6 kW hybrid, same features.
+Zero export: CT / meter on the main incoming hot. Export limit 0 W.
+Grid charge: ON. Charge current capped so house + charging cannot trip the 30 A main.
+Battery reserve: keep 40–50% SOC for outages (do not flatten every night).
+Battery: 3 × 5.12 kWh LiFePO₄, 51.2 V — Dyness DL5.0C or Pylontech US5000 (or BYD equal), CAN/RS485 to inverter. Total 15.36 kWh. Price a 4th module as optional add-on.
+Protection: DC isolator + DC MCBs per string, DC SPD Type 2, AC isolator, AC MCB, RCCB 30 mA, AC SPD Type 2, proper earthing.
+Mounting: aluminum rails, mid/end clamps, stainless L-feet, EPDM; typhoon wind rating. Confirm patio structure can take panels; reinforce if needed.
+Electrical: new critical-loads subpanel; licensed electrician; LGU electrical permit / as-built. No net-metering application.
+
+Commissioning you must demonstrateExport stays at 0 W with battery full and sun up  
+Grid charge respects the 30 A limit  
+Brownout: AC + office + fridge transfer on backup  
+App monitoring handed over (Wi-Fi)
+
+Quote format (required)Brand + exact model + qty + unit price for: panels, inverter, batteries, rails, protection, panelboard, labor, permits  
+Warranty years (panels / inverter / battery) and who honors them in PH  
+Timeline and what’s excluded (roof repair, service upgrade, extra trenching)
+
+Optional line items4th 5.12 kWh battery  
+Patio structural stiffening  
+Service upgrade 30 A → 60 A (price separately)
+
+Please include a simple string map (which panels on which MPPT).Thank you.
+
+I am also hoping that the panels will help keep the second floor cooler. It is a metal beam / tin roof construction, with minor insulation and a hardiplex sheath on the inside. It's is too damn hot up there, especially in the dry season when it is very hot and extremely sunny.
+
+Solar will shade the tin, but it won’t turn the second floor into a cool room by itself. I’ll give you realistic temperature effects and what to add under the roof.Yes — panels will help. They will not make the second floor comfortable by themselves.A bare GI / tin roof in a Luzon dry-season noon is an oven. The sheet can sit far above air temperature and dump heat through the beams into the hardiflex. Panels block a large share of that radiation. Measured work has found ceilings under PV about ~3 °C cooler than unshaded roofs, and ~38% less heat hitting the roof deck when panels are rack-mounted with an air gap. Warehouse tests on metal roofs show the same pattern: shaded metal heats less, interiors feel better at peak sun. 
+
+e360.yale.edu
+
+For your half-second-storey that is tin + almost no insulation + hardiflex, expect something like:Under the panels: roof sheet and ceiling noticeably less brutal at 1–3 pm  
+Room air: maybe 1–3 °C lower if you also vent the cavity — not 8 °C  
+Uncovered tin (edges, west gable, patio not fully covered): still a heater  
+Nights: little help; tin still radiates stored heat for a while
+
+So: better, not cool.Make the cooling effect real1. Leave an air gap under the modules
+Do not strap panels flat to the ridges. Rails that hold the glass 80–150 mm off the tin let air wash the hot backs of the panels and the roof. That gap is both PV cooling and house cooling. Tell the installer “ventilated rack, not flush.”2. Cover the second-floor roof first
+Put as much of the 9.3 kWp as possible on the planes over the hot rooms. South patio helps the room under it; east/west house planes help the second floor. The 10×1 m strip still is not worth it.3. Add a cheap radiant barrier while the roof is open
+This matters as much as the panels for a tin + hardiflex sandwich:Double-sided foil / “sisalation” under the purlins, shiny side toward the air gap  
+Or foil-faced foam boards between beams, taped at joints  
+Seal obvious gaps so hot air does not pour into the room
+
+Foil stops radiant heat from the glowing tin. Hardiflex alone barely does.4. Vent the cavity
+A high vent at the ridge and low vents at the eaves (insect screen) so the space between tin and hardiflex can exhale. Without that, you just built a foil-lined oven.5. Ceiling fan + the 1 HP AC you already have
+After shade + foil, the AC will cycle less. That also saves battery at night.What not to expectPainting the tin white under the array is optional; the panels already shade it. White or foil on exposed leftover tin is worth it.  
+Spray foam everywhere is effective but expensive and messy with live electrical work — foil + gap + vent is the practical add-on during the solar install.  
+West wall and windows will still cook the room. Curtains / film help more than another two panels.
+
+One line for the installer quote:
+“Mount arrays over the second-floor occupied rooms with a ventilated air gap; install foil radiant barrier and eaves-to-ridge ventilation on those planes while the roof is accessible.”Ask them to price that as a separate line so you can see it. Combined with the hybrid system, dry-season afternoons should stop feeling like the roof is on fire — the room still wants the AC to sleep, just not at full blast all day.
+
+Huh. I just thought of this:
+Panels affixed at the top with a pivot. Lower has a raising mechanism (single too expensive, one mechanism for a group better).
+Morning - east panels  flat against roof, west panels up at angle to catch morning sun.
+Noon - east panels and west panels level - not flat against roof. Best for noon sun?
+Afternoon -  west panels west against roof, east panels up at angle to catch morning sun.
+Wind speed detection to determine if panels should be flattened to roofs and locked in place.
+I know, I know - custom and expensive.
+
+The idea is coherent. It is also almost always the wrong spend on a residential GI roof in Bulacan.You already have a crude, zero-moving-part version of that schedule:Morning sun → east face flush  
+Afternoon sun → west face flush  
+Noon → both faces still see a lot of high tropical sun
+
+That is why east/west split only loses on the order of 5–12% a year versus a perfect south array. A tracker is fighting for the last slice, not the first.What your mechanism would actually doTime
+Your plan
+What flush E/W already does
+Morning
+East flat (good). West tilted toward the morning sun
+East already faces the morning. West is the wrong plane for 6–10 am; tilting it east means a tall rack looking over the ridge
+Noon
+Both leveled toward horizontal
+Best tropical geometry, yes — but your roof pitch is already not steep. Extra lift is a few percent at most
+Afternoon
+West flat (good). East tilted west
+Mirror of morning
+
+The clever part is noon flattening plus wind stow. The rest duplicates what two fixed planes already give you, with worse shading: when the west wing stands up at 7 am it throws shade on itself and maybe on the east wing.Why it breaks in this climateTyphoons and squalls
+Stow-to-flat is mandatory. The failure mode is not “it doesn’t track.” It is “anemometer dies, actuator jams, or power is out, and you have a 9 kW sail on tin.” A locked flat array survives. A half-raised array peels L-feet and the roof.Rain for weeks
+Pivots, screws, linear actuators, and limit switches live in habagat. They corrode, bind, and eat limit switches. Residential trackers are a service business. You would become that business.Structure
+A pivot at the ridge and a lift at the eave puts moving point loads into purlins that were designed for dead load + wind, not a daily hinge. The second-floor tin you want to cool wants panels hugging the sheet with a small air gap — not a kinetic sculpture.Wires and warranties
+Daily flex on PV cable. Module frames not certified for that mount. Inverter still sees the same 8–10 kWp; you did not gain service-panel headroom.Gain vs cost
+A clean single-axis tracker on open ground might add ~15–25% energy. On a small, split, sloped, occupied tin roof, after shading and downtime, you might see 5–15% in a good year — and zero in the year a storm bends a row. That 10% is cheaper as two extra fixed panels (~₱20k) than as custom mechanics.If you still want motion (ranked)Don’t. Fixed E/W + south patio + foil + vent. Best ₱/kWh and best shade.  
+Seasonal manual tilt, twice a year, 10–15° only, on one small south or low-pitch section — pins, not motors. Almost nobody bothers at 15° N.  
+Commercial single-axis on the ground in the yard, if you have space and a fence. Not on the bedroom roof.  
+Your powered group-tilt + wind lock — prototype for a farm, not for the room your family sleeps under.
+
+Wind-stow thinking is the only part I would keep, and only as a design rule for fixed racks: low profile, extra mid-clamps, lockable, no tall triangles.Put the engineering energy into coverage over the hot second floor, a ventilated 8–15 cm gap, and foil. That changes daily life more than a tracker that faces west at 3 pm.
+
+

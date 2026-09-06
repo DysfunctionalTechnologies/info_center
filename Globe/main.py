@@ -1,15 +1,10 @@
 #----------------------------------------------------------#
-#----------------------------------------------------------#
 # Project:    Info_Center_16x32
 # Subproject: Info_Center_GLOBE_23_LEDs
 # Version:    V1.20
 # Date:       September 6, 2026
 # Module:     main.py
 # Author:     Timothy S. Carlson - with Grok AI's assistance
-#----------------------------------------------------------#
-# INFO_CENTER_GLOBE — MicroPython / CYD / Thonny
-# INFO_CENTER_GLOBE — TFT + 23-LED globe (bitstream, no NeoPixel)
-#----------------------------------------------------------#
 #----------------------------------------------------------#
 
 import json
@@ -79,7 +74,7 @@ while True:
     raw = None
     addr = None
     try:
-        raw, addr = sock.recvfrom(256)
+        raw, addr = sock.recvfrom(512)
     except OSError:
         raw = None
 
@@ -113,12 +108,14 @@ while True:
                     if addr:
                         globe.set_master(addr[0])
                     globe.set_mode(name)
+                    globe.set_alerts(msg.get("alerts", []))
                     last_pkt = time.ticks_ms()
-                    print(addr, globe.mode)
-                    
+                    print(addr, globe.mode, msg.get("alerts", []))
+
     if time.ticks_diff(time.ticks_ms(), last_pkt) > FAILSAFE_MS:
         last_seq = None
-        last_pkt = time.ticks_ms()   # don’t re-enter every loop
+        last_pkt = time.ticks_ms()
         globe.set_mode("OFF")
+        globe.set_alerts([])
 
     globe.tick()

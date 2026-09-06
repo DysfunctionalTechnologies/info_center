@@ -1,0 +1,84 @@
+Wireless Globe — bench notes (2026-08-28)
+Side trek off Info_Center_16x32 V1.13. The Pi still owns mode. A Wi‑Fi
+ESP32 only paints it. V1.13.1 patches are unchanged and waiting.
+
+What it is
+Same seven looks as the 23‑LED tail on the matrix:
+Mode               Meaning
+BLUE               untested / no master / CYD failsafe
+GREEN              internet good, no alert
+YELLOW             partial pings
+RED                all pings failed
+FLASH_RED          high alert
+FLASH_YELLOW       low alert
+FLASH_RYK          high and low live
+
+Alerts beat internet colour. Wired tail on the Pi stays. Wireless is
+extra. Unplug the wired globe: data just falls off the jack.
+
+What works tonight
+- CYD at 192.168.0.43:4210, MicroPython / Thonny, USB‑C data (wiggle the
+  Pi-end plug if /dev/ttyUSB0 errno 5).
+- TFT emulates the globe (320×240 landscape). All seven modes proven 
+  from the Pi via UDP.
+- GLOBE_LINK.py on the Pi + push_globe() after update_strip() in
+  INFO_CENTER.main. Live: BLUE, GREEN, FLASH_*.
+- YELLOW / RED not seen in the wild yet; force info_center.internet_status
+  or wait for a real partial/fail with LAN still up.
+
+Network facts
+- UDP is LAN only. No internet required to move a packet.
+- WAN down, LAN up → both globes can go RED/YELLOW.
+- Router/AP dead → Pi wired globe RED; wireless times out to BLUE (60 s).
+  “No master” ≠ “WAN down.”
+
+CYD files (Thonny)
+- ili9341.py — rdagger driver.
+- globe.py — modes + TFT. Must use SoftSPI after Wi‑Fi. Hardware SPI(1)
+  goes black once STA is up. rst=Pin(4) (not None, not shared with CS 15).
+  Backlight GPIO 21. wake() after wlan.connect().
+- main.py — Wi‑Fi, UDP 4210, failsafe BLUE, calls globe.wake() then the
+  recv loop.
+
+Flash timing: FLASH_MS / RYK_MS in globe.py (a bit fast; 700 / 500 later).
+
+Pi file
+GLOBE_LINK.py (uppercase, like the rest of the tree).
+- GLOBE_HOST = "192.168.0.43"
+- GLOBE_PORT = 4210
+- Heartbeat 2 s; seq increments; stale seq ignored on the CYD.
+
+Hardware now vs later
+- Now (bench): CYD TFT only. DIN not wired. Same 5 V pack + 3.3 V data
+  plan as the Pi panel when you do wire it. CYD GPIO 27 (CN1) + GND; do
+  not power 23 LEDs from CYD 3V3.
+- Later (in the globe): cheap ESP32, no display. External 5 V / 2 A jack
+  → split to ESP32 USB‑C/VIN + LED 5 V, common GND, DIN from a 3.3 V GPIO.
+  Antenna not inside a sealed metal shell. Firmware = UDP + NeoPixel only
+  (no TFT, no SoftSPI).
+- Power/data: already proven on the Pi at 3.3 V DIN.
+
+Decisions to keep
+- Dual globe is a feature (wall + remote room), same LAN.
+- DHCP reservation is fine in this house. Do not require it of end users.
+  Later: UDP broadcast or mDNS (infocenter-globe.local).
+- Pi remains source of truth.
+
+Resume order
+1. Optional: slow the flash constants.
+2. USE_LEDS = True + NeoPixel on GPIO 27; TFT still on.
+3. Live a day; then a bare ESP32 in the globe at a new reserved IP; point
+   GLOBE_HOST at it; keep CYD as a spare listener if you want.
+4. Broadcast/mDNS when you care about other houses.
+5. Back to V1.13.1: FX/oil diffs already specified; then logger.exception,
+   UA 1.13, state fields, LOOP_START = 6, password out of WEB.py.
+
+Gotchas (do not relearn)
+- Thonny %Run runs the front tab, not “whatever you last uploaded.”
+- rst=None → AttributeError: 'NoneType' has no attribute 'init'.
+- Paint-before-Wi‑Fi is wiped; set_mode("BLUE") then no-ops because mode
+  is already BLUE. Always wake() after associate.
+- Python one-liners go in python3, not bash.
+- Dual-USB CYDs are sometimes ST7789; this unit is ILI9341 (test.py went
+  blue).
+

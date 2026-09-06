@@ -1,8 +1,8 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project: Info_Center_16x32
-# Version: V1.19
-# Date:    September 2, 2026
+# Version: V1.20
+# Date:    September 5, 2026
 # Module:  DISPLAY.py
 # Author:  Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -229,32 +229,32 @@ def update_upper_panel():
 
 def _update_holiday_scroll(now):
     """
-    Buffer-based holiday scroller (live brightness).
-    Sequence:
-      1. HOLIDAY (PURPLE) scrolls in from right → centres → pauses 3 s → off left
-      2. Full NAME (WHITE) scrolls in from right → completely off left
-      3. Dissolve back to TIME
+    One ribbon: HOLIDAY (purple) + space + NAME (white).
+    Centre and pause on HOLIDAY only, then keep walking the same buffer.
     """
     upper = info_center.upper
     speed = 0.080
     char_w = info_center.font_width + 1
+    label = "HOLIDAY"
 
-    def build_buffer(text, fg_color):
-        text_w = len(text) * char_w
+    def build_ribbon(label_text, name_text):
+        name_text = (name_text or "").strip().upper()
+        parts = [(label_text, COLOR_PURPLE), (" ", COLOR_PURPLE), (name_text, COLOR_WHITE)]
+        n = sum(len(t) for t, _ in parts)
+        text_w = n * char_w
         usable = info_center.panel_width - 2
-        buf_w  = text_w + usable * 2 + 8
-
+        buf_w = text_w + usable * 2 + 8
         buf = [[0 for _ in range(buf_w)] for _ in range(info_center.font_height)]
-
         x = usable
-        for ch in text:
-            bitmap = get_char_bitmap(ord(ch))
-            for y in range(info_center.font_height):
-                for px in range(info_center.font_width):
-                    if (bitmap[y] >> (info_center.font_width - 1 - px)) & 1:
-                        if 0 <= x + px < buf_w:
-                            buf[y][x + px] = fg_color
-            x += char_w
+        for text, fg in parts:
+            for ch in text:
+                bitmap = get_char_bitmap(ord(ch))
+                for y in range(info_center.font_height):
+                    for px in range(info_center.font_width):
+                        if (bitmap[y] >> (info_center.font_width - 1 - px)) & 1:
+                            if 0 <= x + px < buf_w:
+                                buf[y][x + px] = fg
+                x += char_w
         return buf
 
     def blit(pos, buf):
@@ -270,64 +270,47 @@ def _update_holiday_scroll(now):
                     set_pixel(i, color)
 
     if upper.holiday_phase == 1:
-        upper.holiday_text   = "HOLIDAY"
-        upper.holiday_buffer = build_buffer("HOLIDAY", COLOR_PURPLE)
-        upper.holiday_pos    = 0
-        upper.holiday_next   = now
-        upper._paused        = False
-        upper._pause_done    = False
-        upper.holiday_phase  = 2
+        name = (info_center.holiday_name or "").strip().upper()
+        upper.holiday_text = label + " " + name
+        upper.holiday_buffer = build_ribbon(label, name)
+        upper.holiday_pos = 0
+        upper.holiday_next = now
+        upper._paused = False
+        upper._pause_done = False
+        upper.holiday_phase = 2
+        return
 
-    elif upper.holiday_phase == 2:
-        blit(upper.holiday_pos, upper.holiday_buffer)
+    if upper.holiday_phase != 2 or not upper.holiday_buffer:
+        return
 
-        text_w = 7 * char_w
-        usable = info_center.panel_width - 2
-        centre = usable - (usable - text_w) // 2
+    blit(upper.holiday_pos, upper.holiday_buffer)
 
-        if upper.holiday_pos < centre:
-            if now >= upper.holiday_next:
-                upper.holiday_pos += 1
-                upper.holiday_next = now + speed
+    usable = info_center.panel_width - 2
+    label_w = len(label) * char_w
+    centre = usable - (usable - label_w) // 2
+    buf_w = len(upper.holiday_buffer[0])
 
-        elif not upper._paused and not upper._pause_done:
-            upper.holiday_pos = centre
-            upper._paused = True
-            upper.holiday_next = now + 3.0
-
-        elif upper._paused:
-            if now >= upper.holiday_next:
-                upper._paused = False
-                upper._pause_done = True
-                upper.holiday_next = now + speed
-
-        else:
-            if now >= upper.holiday_next:
-                upper.holiday_pos += 1
-                upper.holiday_next = now + speed
-
-                if upper.holiday_pos >= len(upper.holiday_buffer[0]) - usable:
-                    upper.holiday_phase = 3
-                    upper._paused = False
-                    upper._pause_done = False
-
-    elif upper.holiday_phase == 3:
-        name = (info_center.holiday_name or "HOLIDAY").strip().upper()
-        upper.holiday_text   = name
-        upper.holiday_buffer = build_buffer(name, COLOR_WHITE)
-        upper.holiday_pos    = 0
-        upper.holiday_next   = now
-        upper.holiday_phase  = 4
-
-    elif upper.holiday_phase == 4:
+    if upper.holiday_pos < centre:
         if now >= upper.holiday_next:
-            blit(upper.holiday_pos, upper.holiday_buffer)
-
             upper.holiday_pos += 1
             upper.holiday_next = now + speed
 
-            usable = info_center.panel_width - 2
-            if upper.holiday_pos >= len(upper.holiday_buffer[0]) - usable:
+    elif not upper._paused and not upper._pause_done:
+        upper.holiday_pos = centre
+        upper._paused = True
+        upper.holiday_next = now + 3.0
+
+    elif upper._paused:
+        if now >= upper.holiday_next:
+            upper._paused = False
+            upper._pause_done = True
+            upper.holiday_next = now + speed
+
+    else:
+        if now >= upper.holiday_next:
+            upper.holiday_pos += 1
+            upper.holiday_next = now + speed
+            if upper.holiday_pos >= buf_w - usable:
                 upper.pending_mode = 0
                 upper.dissolve_phase = 1
                 upper.dissolve_pixels = get_upper_pixels()
@@ -336,11 +319,13 @@ def _update_holiday_scroll(now):
                 upper.holiday_phase = 0
                 upper._paused = False
                 upper._pause_done = False
-
+                
 #----------------------------------------------------------#
 if __name__ == "__main__":
 #----------------------------------------------------------#
-    print("This module cannot be run directly.")
-    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py")
+    print("This module should not be run directly.")
+    print("Please run either INFO_CENTER.py or DIAGNOSTICS.py\n")
+    from INFO_CENTER import main
+    main()
     exit(0)
 #----------------------------------------------------------#

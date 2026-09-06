@@ -53,3 +53,18 @@ def self_test():
     chirp(660, 120, 180)
     time.sleep_ms(200)
     chirp(440, 160, 180)
+    
+def welcome():
+    chirp(880, 120, 180)
+    time.sleep_ms(200)
+    chirp(660, 120, 180)
+    time.sleep_ms(200)
+    chirp(440, 160, 180)
+
+def wakeup_fanfare():
+    chirp(523, 500, 180)    # C5
+    chirp(659, 500, 180)    # E5
+    chirp(784, 500, 180)    # G5
+    chirp(1047, 1000, 220)  # C6
+
+    

@@ -1,0 +1,253 @@
+Info Center V1.18 — Review
+Solid structure for a Pi LED project: clear module split, pattern state
+machines, EEPROM v1→v2 migration, dirty-flag LED updates, and a usable
+web console.
+
+The list below is ordered by impact, not file order.
+
+P0 — Correctness / reliability
+
+1.   Shared info_center has no lockFetcher, web, ping worker,
+     diagnostics thread, and the main loop all mutate the same object.
+     CPython’s GIL makes single attribute writes usually atomic, but
+     compound updates are not:fetch_exchange() reads old rate, computes
+     delta, writes rate + last_update + EEPROM
+     Web alert toggles overwrite weather_code / quake_message
+     update_brightness() and web sliders fight over panel_brightness
+
+Fix: one threading.RLock on InfoCenterState (or copy-out snapshots for
+     display, copy-in for fetch results). At minimum, serialize fetcher
+     writes vs web test-alert writes.
+
+2.   Web test alerts fight the live fetcher_apply_web_alerts() stamps
+     fake weather/quake text and sets sets alert_*_until for one year.
+     The next successful fetch_weather()/fetch_earthquake() overwrites
+     weather_code and quake_message, so the lower panel can look
+     “normal” while the globe still flashes for months.
+   
+Fix: Keep a alert_source = "live" | "web_test" flag
+     Skip live overwrite of message/code while web test is on
+     Use a short hold (e.g. 5–10 min), not 365 days
+     Reset should also force a live refetch
+
+3.   Oil demo API cannot supply UralsDemo catalog is WTI, Brent, NG,
+     metals, FX — not URALS_CRUDE_USD. fetch_oil() will leave Urals at 0
+     forever (or at last EEPROM prev). Message still shows URALS $0.00.
+
+Fix: treat missing codes as “omit from ticker”; optionally add
+     authenticated /v1/prices/latest behind OILPRICEAPI_KEY. Demo is
+     also 20 req/hour — your 15 min cadence is fine unless force-refresh
+     + retries stack.
+     
+4.   GET routes change device state/power_off, /set_brightness, /force/…,
+     /alert/… are GET. A logged-in browser prefetch, or a crafted
+     <img src>, can black out the panel.
+   
+Fix: POST (or POST + CSRF). Keep GET only for /status and pages.
+
+5.   Flask bound to 0.0.0.0:5000 with optional missing authIf .web_auth
+     is absent, login is blocked (good), but the port is still open.
+     Session secret is regenerated every process start (OK) but there is
+     no HTTPS, no brute-force delay, password compare is not
+     constant-time.
+
+Fix: bind 127.0.0.1 unless INFOCENTER_WEB_BIND is set; refuse to start
+     routes that mutate state when auth is unconfigured;
+     hmac.compare_digest for password.
+
+P1 — Real bugs / logic holes
+
+6.   set_auto_brightness does not apply the day/night target immediately
+     Flag flips; brightness waits for the next update_brightness() frame.
+     Usually <25 ms, but if main is in diag_busy / sleep it can lag.
+     Call _apply_auto_target_if_needed() in that route.
+     
+7.   Holiday scroll geometry
+     centre = usable - (usable - text_w) // 2 is not the same as (usable
+     - text_w) // 2. “HOLIDAY” may not visually center. Same formula
+     appears in scroll_message.center_pos.
+     
+8.   continuous_scroll_message rebuilds when sc.text != string_to_scroll
+     Rebuild sets pattern_init = False then True in the same call — OK —
+     but need_rebuild in weather/oil/quake also clear_lower_panel()
+     first, so you get a flash every data tick. Rebuild only when the
+     constructed message actually changed.
+     
+9.   Exchange “previous close” vs last fetch
+     last_exchange_rate is the previous successful fetch, not a daily
+     close. Alerts fire on 0.25 PHP moves between 15-minute polls.
+     Either document that or persist a true daily close (you already do
+     this correctly for oil).
+     
+10.  Quake / weather alerts never auto-clear from live data
+     raise_alert() only extends alert_*_until. A later “no quake” fetch
+     does not lower the globe. After ALERT_DURATION (300 s) it expires,
+     which is OK, but stacked web-test + live is confusing (see P0.2).
+     
+11.  draw_border leftover
+
+	 get_conversion_value(row=r if False else info_center.panel_height - 1, column=c)
+
+     Works, but is a landmine. Use panel_height - 1.
+
+12.  INDICATORS.indicate_am_or_pm writes pm_flag every call
+     Harmless, but it is display code mutating clock state. Compute PM
+     in the time-update path only.
+
+13.  Pac-Man clear_lower_panel() every frame
+     Full 8×30 pixel wipe + redraw at ~15 fps. Works, but it is the
+     heaviest pattern and will hitch if strip.show() is slow on PIO.
+     Dirty-rect or erase previous sprite boxes.
+     
+14.  Software watchdog os.execv from a daemon thread
+     Fine under systemd. If launched from a shell, it can surprise you.
+     Also strip_cleanup() from the watchdog thread races update_strip()
+     on the main thread (strip_lock is not used in cleanup). Use the
+     lock in strip_cleanup().
+     
+15.  PANEL.py imports DATA_FETCHER._save_persisted
+     Circular-ish coupling (CONFIG → … → PANEL → DATA_FETCHER → CONFIG).
+     Move persist helpers to EEPROM.py (already the right place).
+     
+P2 — Cleanup
+
+16.  Dead / unused imports
+     Examples: INDICATORS pulls init_strip, update_strip, clear_panel,
+     many colors; DIAGNOSTICS imports color_wipe_panel; EARTHQUAKE
+     imports a pile of unused colors; INFO_CENTER imports diagnostics
+     but never uses it (web does).
+     
+17.  Banner comments
+     The #----------# frames make diffs noisy. Keep a short module
+     header; drop per-function boxes.
+     
+18.  Magic numbers vs CONFIG
+     Holiday scroll speed 0.080, 3 s pause, IMONITOR start_col + 2/4/8…,
+     Pac-Man row clip 7..14, web SESSION_TIMEOUT = 90, globe host
+     192.168.0.43. Put them in CONFIG.
+     
+19.  Duplicate pixel helpers
+     EXCHANGE.get_lower_pixels / clear_lower_pixel vs PANEL.clear_pixel/
+     get_upper_pixels. One panel helper module.
+     
+20.  display_strings 0.3 s gate
+     Uses upper.last_string_draw even when drawing the lower splash
+     lines. Rename or split.
+     
+21.  Pattern table
+     PATTERN_HANDLERS[0] = None plus current_pattern starting at 0 is
+     easy to break. Start at LOOP_START after splash, or use named enums.
+     
+22.  Logging format inconsistency
+     Main: %(asctime)s - %(name)s - %(message)s (no level). Diagnostics
+     includes level. Unify.
+     
+P3 — Improvements worth doing next
+
+1.   Config file for lat/lon, location name, test sites, globe IP/port,
+     bind address — not just EEPROM flags.  
+
+2.   Oil: authenticated API + skip zero products; use change_24h from
+     demo instead of home-rolled prev close if you stay on demo.  
+
+3.   Holidays: official path is valid (/api/v4/Holidays/PH/{year}). 
+     Filter nationalHoliday / holidayTypes so observances don’t take
+     over the upper panel. Cache the year’s JSON on disk so midnight
+     still works offline.  
+
+4.   Internet status is only updated during pattern 6. Border/globe stay
+     BLUE/stale for a long time after boot. Run a lightweight ping in
+     the fetcher loop.  
+
+5:   Brightness: apply_brightness is per-pixel software scale and strip
+     constructor brightness 0x1F. Document that 63/31 are relative to
+     that cap, or set strip brightness to 255 and do all scaling in
+     software.  
+
+6.   Watchdog: prefer systemd WatchdogSec= + sd_notify instead of execv.
+
+7.   WEB diagnostics vs main loop: diag_busy is good; also pause
+     pattern_end_time so you don’t skip a pattern after a 20 s panel
+     test.  
+
+8.   Type safety: current_time as a 6-char string invites
+     int(current_time[0]) crashes if anything writes a bad value. Store
+     datetime once per frame.
+
+Suggested work order
+
+Pri Item                          Why first
+1   Lock + stop web-test vs       Wrong alerts on the real display
+    fetcher clobber
+    
+2   POST for mutating web routes  Safety on a LAN device
+    + bind/auth harden
+    
+3   Oil: hide missing Urals /     Garbage ticker
+    optional API key
+    
+4   Move persist out of PANEL;    Cleanup that prevents future bugs
+    fix draw_border
+    
+5   Holiday center math + scroll  Visible glitches
+    rebuild flash
+    
+6   Background internet check     Border color actually means something
+
+7   Split WEB.py (below)          Maintainability
+
+8   Import/comment trim, CONFIG   Hygiene
+    magic numbers
+
+Splitting WEB.py
+
+Right now it is auth + session + HTML + CSS + JS + routes + alert test
+harness + log ring + Flask boot.
+
+Suggested layout:
+
+web/
+  __init__.py          # create_app(), start_web()
+  auth.py              # _load_web_auth, session lock, is_authenticated, timeout
+  state.py             # status payload builder, brightness helpers, force_pattern
+  alerts.py            # web test-alert flags + apply/clear
+  logs.py              # RingLogHandler, attach/detach
+  templates/
+    login.html
+    index.html
+    diag.html
+    logs.html
+    shared.css         # or static/app.css + app.js
+  static/
+    app.js
+  routes/
+    pages.py           # /, /login, /diag, /logs
+    control.py         # power, brightness, flags, globe push
+    data.py            # force_refresh, force pattern
+    diagnostics.py     # /diag_test/n
+    alerts.py          # /alert/*
+
+Rules of thumb
+
+- Templates out of Python strings (syntax highlighting,
+  no """ + SHARED_CSS + """).
+
+- create_app() so you can test routes without starting the LED stack.
+
+- Routes only talk to a small WebFacade that wraps info_center + PANEL
+  power functions — keeps Flask from importing DIAGNOSTICS at module top
+  (that pulls the strip).
+  
+- One web/static/app.js for call(), updateStatus(), slider — the three
+  pages duplicate this.
+
+If you want a smaller first cut (2 files instead of a package):
+
+- WEB_PAGES.py — HTML/CSS/JS only  
+ 
+- WEB.py — Flask app, auth, routes
+
+That’s enough to make the next feature (e.g. live weather JSON on the
+control page) not require scrolling a 1k-line file.I can start with P0
+items as concrete patches (lock + alert isolation + oil missing-codes +
+POST routes) whenever you want to move from review into V1.19.
