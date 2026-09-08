@@ -20,3 +20,4 @@ venv/
 *.tmp
 EOF
 Globe/secrets.py
+CONTEXT_PROMPT.txt
