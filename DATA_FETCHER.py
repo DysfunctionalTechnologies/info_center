@@ -629,7 +629,7 @@ def _fetcher_loop():
                     exchange_ok = False
                     exchange_retry.failure()
 
-            if oil_retry.allow(now) and (
+            if getattr(info_center, "show_oil", True) and oil_retry.allow(now) and (
                     not oil_ok or
                     (now - info_center.oil_last_update) >=
                     info_center.oil_update_interval):

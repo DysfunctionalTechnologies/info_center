@@ -452,8 +452,13 @@ def logs_json():
         return _deny_json()
     with _log_ring_lock:
         lines = list(LOG_RING)
-    return jsonify({"lines": lines})
-
+    return jsonify({
+        "lines": lines,
+        "count": len(lines),
+        "web_logs": bool(_web_logs_enabled),
+        "debug_mode": bool(info_center.debug_mode),
+    })
+    
 @app.route("/status")
 def status():
     if not is_authenticated():
