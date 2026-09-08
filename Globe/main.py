@@ -1,8 +1,8 @@
 #----------------------------------------------------------#
 # Project:    Info_Center_16x32
-# Subproject: Info_Center_GLOBE_23_LEDs
-# Version:    V1.20
-# Date:       September 6, 2026
+# Subproject: Info_Center_GLOBE
+# Version:    V1.21
+# Date:       September 8, 2026
 # Module:     main.py
 # Author:     Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -12,6 +12,7 @@ import time
 import network
 import socket
 import globe
+from BOARD import pins
 
 try:
     import secrets
@@ -23,6 +24,8 @@ except Exception:
 
 UDP_PORT = 4210
 FAILSAFE_MS = 60000
+HELLO_MS = 5000
+P = pins()
 
 def wifi_connect():
     wlan = network.WLAN(network.STA_IF)
@@ -52,23 +55,60 @@ def parse_packet(msg):
     cmd = str(msg.get("cmd", "globe")).lower()
     if cmd == "off":
         return "OFF"
+    if cmd in ("hello", "here", "ack"):
+        return None
     return str(msg.get("mode", "BLUE")).upper()
+
+def _my_ip(wlan):
+    try:
+        ip = wlan.ifconfig()[0]
+        if ip and ip != "0.0.0.0":
+            return ip
+    except Exception:
+        pass
+    return ""
 
 wlan = wifi_connect()
 globe.wake()
 print("wlan", wlan.ifconfig())
 print("status", wlan.status())
 print("mode", globe.mode)
-print("tft", globe.tft)
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+try:
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+except Exception:
+    pass
 sock.bind(("0.0.0.0", UDP_PORT))
 sock.settimeout(0.05)
 
 last_pkt = time.ticks_ms()
+last_hello = time.ticks_add(time.ticks_ms(), -HELLO_MS)
 last_seq = None
 last_boot = None
-print("INFO_CENTER_GLOBE udp :%d" % UDP_PORT)
+master = None
+boot_id = time.ticks_ms() & 0xFFFF
+print("INFO_CENTER_GLOBE udp :%d sku %s" % (UDP_PORT, P["SKU"]))
+
+def send_hello():
+    ip = _my_ip(wlan)
+    msg = {
+        "v": 1,
+        "cmd": "hello",
+        "sku": P["SKU"],
+        "n": globe.LED_N,
+        "boot": boot_id,
+        "ip": ip,
+    }
+    raw = json.dumps(msg).encode("ascii")
+    sock.sendto(raw, ("255.255.255.255", UDP_PORT))
+    print("hello", ip)
+
+def send_ack(addr):
+    raw = json.dumps({"v": 1, "cmd": "ack"}).encode("ascii")
+    sock.sendto(raw, addr)
+    print("ack", addr[0])
 
 while True:
     raw = None
@@ -85,36 +125,58 @@ while True:
             msg = None
 
         if isinstance(msg, dict):
-            stale = False
-            boot = msg.get("boot")
-            if boot is not None and boot != last_boot:
-                last_boot = boot
-                last_seq = None
-
-            seq = msg.get("seq")
-            if seq is not None:
-                try:
-                    seq = int(seq) & 0xFFFF
-                    if last_seq is not None and ((seq - last_seq) & 0xFFFF) > 0x7FFF:
-                        stale = True
+            cmd = str(msg.get("cmd", "globe")).lower()
+            if cmd == "hello":
+                pass
+            elif cmd == "here":
+                if addr:
+                    if master and addr[0] != master:
+                        print("here ignore", addr[0], "steady", master)
                     else:
-                        last_seq = seq
-                except Exception:
+                        master = addr[0]
+                        globe.set_master(master)
+                        send_ack(addr)
+                        last_pkt = time.ticks_ms()
+                        print("here", master)
+            else:
+                stale = False
+                boot = msg.get("boot")
+                if boot is not None and boot != last_boot:
+                    last_boot = boot
+                    last_seq = None
+                seq = msg.get("seq")
+                if seq is not None:
+                    try:
+                        seq = int(seq) & 0xFFFF
+                        if last_seq is not None and ((seq - last_seq) & 0xFFFF) > 0x7FFF:
+                            stale = True
+                        else:
+                            last_seq = seq
+                    except Exception:
+                        stale = True
+                if master and addr and addr[0] != master:
                     stale = True
+                if not stale:
+                    name = parse_packet(msg)
+                    if name:
+                        if addr:
+                            if master is None:
+                                master = addr[0]
+                            globe.set_master(addr[0])
+                        globe.set_mode(name)
+                        globe.set_alerts(msg.get("alerts", []))
+                        last_pkt = time.ticks_ms()
+                        print(addr, globe.mode, msg.get("alerts", []))
 
-            if not stale:
-                name = parse_packet(msg)
-                if name:
-                    if addr:
-                        globe.set_master(addr[0])
-                    globe.set_mode(name)
-                    globe.set_alerts(msg.get("alerts", []))
-                    last_pkt = time.ticks_ms()
-                    print(addr, globe.mode, msg.get("alerts", []))
+    if master is None:
+        if time.ticks_diff(time.ticks_ms(), last_hello) >= 0:
+            last_hello = time.ticks_add(time.ticks_ms(), HELLO_MS)
+            send_hello()
 
     if time.ticks_diff(time.ticks_ms(), last_pkt) > FAILSAFE_MS:
         last_seq = None
         last_pkt = time.ticks_ms()
+        master = None
         globe.set_mode("OFF")
         globe.set_alerts([])
 

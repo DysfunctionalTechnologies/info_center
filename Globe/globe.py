@@ -1,28 +1,41 @@
 #----------------------------------------------------------#
 # Project:    Info_Center_16x32
-# Subproject: Info_Center_GLOBE_23_LEDs
-# Version:    V1.20
-# Date:       September 6, 2026
+# Subproject: Info_Center_GLOBE
+# Version:    V1.21
+# Date:       September 8, 2026
 # Module:     globe.py
 # Author:     Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
 
 import time
-from   machine import Pin, SoftSPI, bitstream
-from   ili9341 import Display, color565
+from   machine import Pin, bitstream
+from   BOARD   import pins
 import speaker
 
-LED_PIN = 27
-LED_N = 23
-USE_LEDS = True
+P = pins()
+
+LED_PIN = P["LED_PIN"]
+LED_N = int(P["LED_N"]) + int(P["GLANCE_N"])
+RING_N = int(P["LED_N"])
+USE_LEDS = P["USE_LEDS"]
+USE_TFT = P["USE_TFT"]
 LED_TIMING = (400, 850, 800, 450)
 
-BL_PIN = 21
-CS_PIN = 15
-DC_PIN = 2
-RST_PIN = 4
-SCK_PIN = 14
-MOSI_PIN = 13
+if USE_TFT:
+    from machine import SoftSPI
+    from ili9341 import Display, color565
+    BL_PIN = P["BL_PIN"]
+    CS_PIN = P["CS_PIN"]
+    DC_PIN = P["DC_PIN"]
+    RST_PIN = P["RST_PIN"]
+    SCK_PIN = P["SCK_PIN"]
+    MOSI_PIN = P["MOSI_PIN"]
+    MISO_PIN = P["MISO_PIN"]
+else:
+    def color565(*_a):
+        return 0
+    BL_PIN = CS_PIN = DC_PIN = RST_PIN = None
+    SCK_PIN = MOSI_PIN = MISO_PIN = None
 
 RED = color565(255, 0, 0)
 YELLOW = color565(255, 180, 0)
@@ -45,8 +58,21 @@ MODES = {
     "FLASH_RED", "FLASH_YELLOW", "FLASH_RYK", "OFF",
 }
 
-bl = Pin(BL_PIN, Pin.OUT)
-bl.on()
+GLANCE = {
+    25: "WX",
+    24: "QK",
+    23: "FX",
+    22: "ST",
+    21: "OL",
+    20: None,
+}
+RYK_GROUPS = ("WX", "QK")
+
+bl = None
+if USE_TFT and BL_PIN is not None:
+    bl = Pin(BL_PIN, Pin.OUT)
+    bl.on()
+
 led_pin = Pin(LED_PIN, Pin.OUT)
 led_pin.value(0)
 
@@ -74,6 +100,7 @@ _slots = {
 
 SLOT_CHARS = 10
 SLOT_PAD = "          "
+
 def set_master(addr):
     global _master_ip
     if addr:
@@ -95,9 +122,9 @@ def set_alerts(raw):
     if out == _items:
         return
     _items = out
-    if tft is not None:
+    if USE_TFT and tft is not None:
         _paint_status()
-        
+
 def _cyd_ip():
     try:
         import network
@@ -111,8 +138,13 @@ def _cyd_ip():
 
 def _init_tft():
     global spi, tft, _tft_ready
+    if not USE_TFT:
+        tft = None
+        _tft_ready = False
+        return
     print("TFT init start")
-    bl.on()
+    if bl is not None:
+        bl.on()
     if spi is not None:
         try:
             spi.deinit()
@@ -126,7 +158,7 @@ def _init_tft():
             phase=0,
             sck=Pin(SCK_PIN),
             mosi=Pin(MOSI_PIN),
-            miso=Pin(12),
+            miso=Pin(MISO_PIN),
         )
         tft = Display(
             spi,
@@ -151,16 +183,68 @@ def _cycle_len(m):
         return 2
     return 1
 
-def _paint_leds(rgb):
+def _item_band(group):
+    if not group:
+        return ""
+    got_r = False
+    got_y = False
+    for g, s, b in _items:
+        if g != group:
+            continue
+        if b == "R":
+            got_r = True
+        elif b == "Y":
+            got_y = True
+    if group in RYK_GROUPS:
+        if got_r and got_y:
+            return "RYK"
+        if got_r:
+            return "R"
+        if got_y:
+            return "Y"
+        return ""
+    if got_r:
+        return "R"
+    if got_y:
+        return "Y"
+    return ""
+
+def _flash_rgb(band, step):
+    if band == "RYK":
+        k = step % 3
+        if k == 0:
+            return LED_RED
+        if k == 1:
+            return LED_YELLOW
+        return LED_BLACK
+    if band == "R":
+        return LED_RED if (step % 2) == 0 else LED_BLACK
+    if band == "Y":
+        return LED_YELLOW if (step % 2) == 0 else LED_BLACK
+    return LED_BLACK
+
+def _glance_rgb(idx, step):
+    return _flash_rgb(_item_band(GLANCE.get(idx)), step)
+
+def _paint_leds(rgb, step=0):
     if not USE_LEDS:
         return
     r, g, b = rgb
     buf = bytearray(LED_N * 3)
-    for i in range(LED_N):
+    ring = RING_N if RING_N <= LED_N else LED_N
+    for i in range(ring):
         buf[i * 3] = g
         buf[i * 3 + 1] = r
         buf[i * 3 + 2] = b
+    for i in range(ring, LED_N):
+        gr, gg, gb = _glance_rgb(i, step)
+        buf[i * 3] = gg
+        buf[i * 3 + 1] = gr
+        buf[i * 3 + 2] = gb
     bitstream(led_pin, 0, LED_TIMING, buf)
+
+def black():
+    _paint_leds(LED_BLACK, 0)
 
 def _update_status_from_mode(name):
     global _net_line, _alert_line, _items
@@ -221,6 +305,8 @@ def _slot_word(group, band):
     return ""
 
 def _paint_slot(y, col, group, band, color):
+    if tft is None:
+        return
     key = (group, band)
     new = _slot_word(group, band)
     old = _slots.get(key, "")
@@ -236,9 +322,11 @@ def _paint_slot(y, col, group, band, color):
 def _paint_group(y, group):
     _paint_slot(y, 0,  group, "Y", YELLOW)
     _paint_slot(y, 10, group, "R", RED)
-    
+
 def _paint_status():
     global _tft_ready
+    if not USE_TFT:
+        return
     if tft is None:
         print("TFT none, retry init")
         _init_tft()
@@ -265,6 +353,12 @@ def _paint_status():
     except Exception as e:
         print("TFT text", e)
 
+def _glance_busy():
+    for group in GLANCE.values():
+        if _item_band(group):
+            return True
+    return False
+
 def _apply_mode(name):
     global mode, _phase, _next, _pending_mode
     mode = name
@@ -272,9 +366,9 @@ def _apply_mode(name):
     _phase = 0
     _next = time.ticks_ms()
     _update_status_from_mode(name)
-    _paint_leds(_leds_for_mode(name, 0))
+    _paint_leds(_leds_for_mode(name, 0), 0)
     _paint_status()
-    if name.startswith("FLASH"):
+    if name.startswith("FLASH") and P["USE_SPEAKER"]:
         try:
             speaker.announce(name)
         except Exception:
@@ -294,14 +388,14 @@ def set_mode(name, force=False):
     _apply_mode(name)
 
 def wake():
-    print("wake")
+    print("wake", P["SKU"], "led", LED_PIN, "n", LED_N, "ring", RING_N)
     _init_tft()
-    print("wake tft", tft)
     set_mode(mode, force=True)
 
 def tick():
     global _phase, _next
-    if mode not in ("FLASH_RED", "FLASH_YELLOW", "FLASH_RYK"):
+    flashing = mode in ("FLASH_RED", "FLASH_YELLOW", "FLASH_RYK")
+    if not flashing and not _glance_busy():
         return
     now = time.ticks_ms()
     if time.ticks_diff(now, _next) < 0:
@@ -310,7 +404,16 @@ def tick():
     _next = time.ticks_add(now, interval)
     _phase += 1
     n = _cycle_len(mode)
-    step = _phase % n
-    _paint_leds(_leds_for_mode(mode, step))
-    if step == 0 and _pending_mode is not None:
+    gstep = _phase % n if flashing else 0
+    _paint_leds(_leds_for_mode(mode, gstep), _phase)
+    if flashing and gstep == 0 and _pending_mode is not None:
         _apply_mode(_pending_mode)
+
+black()
+
+#----------------------------------------------------------#
+if __name__ == "__main__":
+#----------------------------------------------------------#
+    print("This module cannot be run directly.")
+    print("Please run main.py")
+#----------------------------------------------------------#

@@ -26,13 +26,51 @@ GLOBE_HOST  = globe_host()
 GLOBE_PORT  = 4210
 HEARTBEAT_S = 2.0
 
-_sock      = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 _sock.setblocking(False)
+try:
+    _sock.bind(("0.0.0.0", GLOBE_PORT))
+except OSError as e:
+    logger.warning("globe listen: %s", e)
+
 _seq       = 0
 _last_mode = None
 _last_send = 0.0
 _BOOT_ID   = os.getpid()
+_peer   = globe_host() or GLOBE_HOST
+_locked = None
 
+def _poll_hello():
+    global _peer, _locked
+    enabled = getattr(info_center, "globe_push_enabled", False)
+    if not enabled:
+        return
+    try:
+        raw, addr = _sock.recvfrom(512)
+    except OSError:
+        return
+    try:
+        msg = json.loads(raw.decode("ascii", "ignore"))
+    except Exception:
+        return
+    if not isinstance(msg, dict):
+        return
+    if str(msg.get("cmd", "")).lower() != "hello":
+        return
+    src = addr[0]
+    if _locked and src != _locked:
+        logger.info("globe hello ignore %s locked %s", src, _locked)
+        return
+    _locked = src
+    _peer = src
+    here = json.dumps({"v": 1, "cmd": "here", "pi": src}).encode("ascii")
+    try:
+        _sock.sendto(here, addr)
+        logger.info("globe here -> %s sku=%s", src, msg.get("sku"))
+    except OSError as e:
+        logger.warning("globe here: %s", e)
+        
 def current_globe_mode():
     now = time.monotonic()
     high = now < getattr(info_center, "alert_high_until", 0.0)
@@ -54,6 +92,7 @@ def current_globe_mode():
 
 def push_globe(force=False, mode=None):
     global _seq, _last_mode, _last_send
+    _poll_hello()
     enabled = getattr(info_center, "globe_push_enabled", False)
     if mode is None:
         if not enabled:
@@ -75,18 +114,18 @@ def push_globe(force=False, mode=None):
         "cmd": "globe",
         "mode": mode,
         "alerts": why,
-        "n": getattr(info_center, "globe_led_count", 23),
+        "n": getattr(info_center, "globe_led_count", 26),
         "seq": _seq,
         "boot": _BOOT_ID,
     }).encode("ascii")
     try:
-        dest = globe_host() or GLOBE_HOST
+        dest = _peer or globe_host() or GLOBE_HOST
         _sock.sendto(payload, (dest, GLOBE_PORT))
         _last_mode = mode
         _last_send = now
     except OSError as e:
         logger.warning("globe udp: %s", e)
-
+        
 #----------------------------------------------------------#
 if __name__ == "__main__":
 #----------------------------------------------------------#
