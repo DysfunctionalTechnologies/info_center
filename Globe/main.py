@@ -21,10 +21,12 @@ except Exception:
     WIFI_PASS = ""
 
 UDP_PORT      = 4210
-FAILSAFE_MS   = 60000
-HELLO_MS      = 5000
-WIFI_RETRY_MS = 15000
-P = pins()
+P             = pins()
+
+FAILSAFE_MS   = 60000 # 60 seconds
+HELLO_MS      = 5000  #  5 seconds
+BEACON_MS     = 30000 # 30 seconds
+WIFI_RETRY_MS = 15000 # 15 seconds
 
 def wifi_connect():
     wlan = network.WLAN(network.STA_IF)
@@ -185,11 +187,11 @@ while True:
             wlan = wifi_connect()
             print("wlan", wlan.ifconfig(), wlan.status())
 
-    if master is None:
-        if time.ticks_diff(time.ticks_ms(), last_hello) >= 0:
-            last_hello = time.ticks_add(time.ticks_ms(), HELLO_MS)
-            send_hello()
-
+    wait = HELLO_MS if master is None else BEACON_MS
+    if time.ticks_diff(time.ticks_ms(), last_hello) >= 0:
+        last_hello = time.ticks_add(time.ticks_ms(), wait)
+        send_hello()
+    
     if time.ticks_diff(time.ticks_ms(), last_pkt) > FAILSAFE_MS:
         last_seq = None
         last_pkt = time.ticks_ms()

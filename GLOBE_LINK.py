@@ -20,9 +20,11 @@ from PLATFORM import globe_host
 
 logger = logging.getLogger(__name__)
 
-GLOBE_HOST  = globe_host()
-GLOBE_PORT  = 4210
-HEARTBEAT_S = 2.0
+GLOBE_HOST    = globe_host()
+GLOBE_PORT    = 4210
+HEARTBEAT_S   = 2.0
+LOCK_EXPIRE_S = 90.0
+_seen         = 0.0
 
 _sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 _sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -40,10 +42,14 @@ _peer   = globe_host() or GLOBE_HOST
 _locked = None
 
 def _poll_hello():
-    global _peer, _locked
+    global _peer, _locked, _seen
     enabled = getattr(info_center, "globe_push_enabled", False)
     if not enabled:
         return
+    now = time.monotonic()
+    if _locked and (now - _seen) > LOCK_EXPIRE_S:
+        logger.info("globe lock expire %s", _locked)
+        _locked = None
     try:
         raw, addr = _sock.recvfrom(512)
     except OSError:
@@ -60,15 +66,19 @@ def _poll_hello():
     if _locked and src != _locked:
         logger.info("globe hello ignore %s locked %s", src, _locked)
         return
+    if _locked == src:
+        _seen = now
+        return
     _locked = src
     _peer = src
+    _seen = now
     here = json.dumps({"v": 1, "cmd": "here", "pi": src}).encode("ascii")
     try:
         _sock.sendto(here, addr)
         logger.info("globe here -> %s sku=%s", src, msg.get("sku"))
     except OSError as e:
         logger.warning("globe here: %s", e)
-        
+                
 def current_globe_mode():
     now = time.monotonic()
     high = now < getattr(info_center, "alert_high_until", 0.0)
