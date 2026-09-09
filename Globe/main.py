@@ -1,8 +1,6 @@
 #----------------------------------------------------------#
 # Project:    Info_Center_16x32
 # Subproject: Info_Center_GLOBE
-# Version:    V1.21
-# Date:       September 8, 2026
 # Module:     main.py
 # Author:     Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -22,9 +20,10 @@ except Exception:
     WIFI_SSID = ""
     WIFI_PASS = ""
 
-UDP_PORT = 4210
-FAILSAFE_MS = 60000
-HELLO_MS = 5000
+UDP_PORT      = 4210
+FAILSAFE_MS   = 60000
+HELLO_MS      = 5000
+WIFI_RETRY_MS = 15000
 P = pins()
 
 def wifi_connect():
@@ -72,6 +71,7 @@ wlan = wifi_connect()
 globe.wake()
 print("wlan", wlan.ifconfig())
 print("status", wlan.status())
+print("ssid", WIFI_SSID)
 print("mode", globe.mode)
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -85,6 +85,7 @@ sock.settimeout(0.05)
 
 last_pkt = time.ticks_ms()
 last_hello = time.ticks_add(time.ticks_ms(), -HELLO_MS)
+last_wifi = time.ticks_ms()
 last_seq = None
 last_boot = None
 master = None
@@ -92,6 +93,9 @@ boot_id = time.ticks_ms() & 0xFFFF
 print("INFO_CENTER_GLOBE udp :%d sku %s" % (UDP_PORT, P["SKU"]))
 
 def send_hello():
+    if not wlan.isconnected():
+        print("hello skip, no wifi")
+        return
     ip = _my_ip(wlan)
     msg = {
         "v": 1,
@@ -102,13 +106,19 @@ def send_hello():
         "ip": ip,
     }
     raw = json.dumps(msg).encode("ascii")
-    sock.sendto(raw, ("255.255.255.255", UDP_PORT))
-    print("hello", ip)
+    try:
+        sock.sendto(raw, ("255.255.255.255", UDP_PORT))
+        print("hello", ip)
+    except OSError as e:
+        print("hello fail", e)
 
 def send_ack(addr):
     raw = json.dumps({"v": 1, "cmd": "ack"}).encode("ascii")
-    sock.sendto(raw, addr)
-    print("ack", addr[0])
+    try:
+        sock.sendto(raw, addr)
+        print("ack", addr[0])
+    except OSError as e:
+        print("ack fail", e)
 
 while True:
     raw = None
@@ -167,6 +177,13 @@ while True:
                         globe.set_alerts(msg.get("alerts", []))
                         last_pkt = time.ticks_ms()
                         print(addr, globe.mode, msg.get("alerts", []))
+
+    if not wlan.isconnected():
+        if time.ticks_diff(time.ticks_ms(), last_wifi) >= WIFI_RETRY_MS:
+            last_wifi = time.ticks_ms()
+            print("wifi retry")
+            wlan = wifi_connect()
+            print("wlan", wlan.ifconfig(), wlan.status())
 
     if master is None:
         if time.ticks_diff(time.ticks_ms(), last_hello) >= 0:

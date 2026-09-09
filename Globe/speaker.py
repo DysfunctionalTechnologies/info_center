@@ -1,9 +1,7 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project:    Info_Center_16x32
-# Subproject: Info_Center_GLOBE_23_LEDs
-# Version:    V1.20
-# Date:       September 6, 2026
+# Subproject: Info_Center_GLOBE
 # Module:     speaker.py
 # Author:     Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -12,8 +10,12 @@
 #----------------------------------------------------------#
 # GPIO 26, onboard amp, 8 ohm speaker
 #----------------------------------------------------------#
+# For the CYD globe only, no speaker on the S3DEV  globe
+# Toy only
+#----------------------------------------------------------#
 #----------------------------------------------------------#
 
+# System Imports
 from machine import Pin, PWM
 import time
 

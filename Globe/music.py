@@ -1,19 +1,18 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project:    Info_Center_16x32
-# Subproject: Info_Center_GLOBE_23_LEDs
-# Version:    V1.20
-# Date:       September 6, 2026
-# Module:     secrets.py
+# Subproject: Info_Center_GLOBE
+# Module:     music.py
 # Author:     Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
-# INFO_CENTER_GLOBE — MicroPython / CYD / Thonny
-# INFO_CENTER_GLOBE — TFT + 23-LED globe (bitstream, no NeoPixel)
-#----------------------------------------------------------#
-# secrets.py  — on the CYD only, not in the repo
+# For the CYD globe only, no speaker on the S3DEV  globe
+# Toy only
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 
+# System Imports
+
+# Project Imports
 import speaker
 
 DUTY = 180

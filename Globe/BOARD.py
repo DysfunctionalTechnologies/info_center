@@ -1,18 +1,14 @@
 #----------------------------------------------------------#
-#----------------------------------------------------------#
 # Project:    Info_Center_16x32
 # Subproject: Info_Center_GLOBE
-# Version:    V1.21
-# Date:       September 8, 2026
 # Module:     BOARD.py
 # Author:     Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
-#----------------------------------------------------------#
-# Flip SKU per board. Same 20+6 string on both.
 
-SKU = "S3DEV"            # "CYD" or "S3DEV"
+VERSION = "V1.21"
+SKU     = "CYD"     # "CYD" or "S3DEV"
 
-_CYD = {
+_CYD    = {
     "SKU":         "CYD",
     "LED_PIN":     27,
     "LED_N":       20,
@@ -31,7 +27,7 @@ _CYD = {
     "MISO_PIN":    12,
 }
 
-_S3DEV = {
+_S3DEV  = {
     "SKU":         "S3DEV",
     "LED_PIN":     47,
     "LED_N":       20,
@@ -50,7 +46,7 @@ _S3DEV = {
     "MISO_PIN":    None,
 }
 
-_TABLE = {"CYD": _CYD, "S3DEV": _S3DEV}
+_TABLE  = {"CYD": _CYD, "S3DEV": _S3DEV}
 
 def pins():
     return dict(_TABLE.get(SKU, _CYD))

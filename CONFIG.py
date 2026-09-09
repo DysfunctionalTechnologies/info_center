@@ -1,8 +1,8 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project: Info_Center_16x32
-# Version: V1.20
-# Date:    September 5, 2026
+# Version: V1.21
+# Date:    September 10, 2026
 # Module:  CONFIG.py
 # Author:  Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -218,7 +218,7 @@ class InfoCenterState:
         self.program_name_1_string    = "INFO"
         self.program_name_2_string    = "CENTER"
         self.copyright_string         = "(C)2026"
-        self.version_string           = "V1.20"
+        self.version_string           = "V1.21"
 
         self.strip_gpio               = platform_gpio()
         self.panel_layout             = PANEL_LAYOUT

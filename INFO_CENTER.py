@@ -1,8 +1,6 @@
 #----------------------------------------------------------#
 #----------------------------------------------------------#
 # Project: Info_Center_16x32
-# Version: V1.20
-# Date:    September 5, 2026
 # Module:  INFO_CENTER.py
 # Author:  Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#

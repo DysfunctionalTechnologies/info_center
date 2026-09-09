@@ -1,8 +1,6 @@
 #----------------------------------------------------------#
 # Project:    Info_Center_16x32
 # Subproject: Info_Center_GLOBE
-# Version:    V1.21
-# Date:       September 8, 2026
 # Module:     globe.py
 # Author:     Timothy S. Carlson - with Grok AI's assistance
 #----------------------------------------------------------#
@@ -15,20 +13,24 @@ import speaker
 P = pins()
 
 LED_PIN = P["LED_PIN"]
-LED_N = int(P["LED_N"]) + int(P["GLANCE_N"])
 RING_N = int(P["LED_N"])
+GLANCE_N = int(P["GLANCE_N"])
+LED_N = RING_N + GLANCE_N
 USE_LEDS = P["USE_LEDS"]
 USE_TFT = P["USE_TFT"]
 LED_TIMING = (400, 850, 800, 450)
 
+# Glance pixels are RING_N .. RING_N+GLANCE_N-1 (15-20 on S3ZERO, 20-25 on CYD/S3DEV)
+GLANCE_LABELS = (None, "OL", "ST", "FX", "QK", "WX")
+
 if USE_TFT:
     from machine import SoftSPI
     from ili9341 import Display, color565
-    BL_PIN = P["BL_PIN"]
-    CS_PIN = P["CS_PIN"]
-    DC_PIN = P["DC_PIN"]
-    RST_PIN = P["RST_PIN"]
-    SCK_PIN = P["SCK_PIN"]
+    BL_PIN   = P["BL_PIN"]
+    CS_PIN   = P["CS_PIN"]
+    DC_PIN   = P["DC_PIN"]
+    RST_PIN  = P["RST_PIN"]
+    SCK_PIN  = P["SCK_PIN"]
     MOSI_PIN = P["MOSI_PIN"]
     MISO_PIN = P["MISO_PIN"]
 else:
@@ -37,35 +39,33 @@ else:
     BL_PIN = CS_PIN = DC_PIN = RST_PIN = None
     SCK_PIN = MOSI_PIN = MISO_PIN = None
 
-RED = color565(255, 0, 0)
-YELLOW = color565(255, 180, 0)
-GREEN = color565(0, 255, 0)
-BLUE = color565(0, 0, 255)
-BLACK = color565(0, 0, 0)
-WHITE = color565(255, 255, 255)
+TEXT_BLACK  = color565(  0,   0,   0)
+TEXT_RED    = color565(255,   0,   0)
+TEXT_YELLOW = color565(255, 255,   0)
+TEXT_GREEN  = color565(  0, 255,   0)
+TEXT_CYAN   = color565(  0, 255, 255)
+TEXT_BLUE   = color565(  0,   0, 255)
+TEXT_PURPLE = color565(255,   0, 255)
+TEXT_WHITE  = color565(255, 255, 255)
 
-LED_RED = (255, 0, 0)
-LED_YELLOW = (255, 180, 0)
-LED_GREEN = (0, 255, 0)
-LED_BLUE = (0, 40, 255)
-LED_BLACK = (0, 0, 0)
+LED_BRIGHTNESS = 31
+LED_BLACK   = (             0,              0,              0)
+LED_RED     = (LED_BRIGHTNESS,              0,              0)
+LED_YELLOW  = (LED_BRIGHTNESS, LED_BRIGHTNESS,              0)
+LED_GREEN   = (             0, LED_BRIGHTNESS,              0)
+LED_CYAN    = (             0, LED_BRIGHTNESS, LED_BRIGHTNESS)
+LED_BLUE    = (             0,              0, LED_BRIGHTNESS)
+LED_PURPLE  = (LED_BRIGHTNESS,              0, LED_BRIGHTNESS)
+LED_WHITE   = (LED_BRIGHTNESS, LED_BRIGHTNESS, LED_BRIGHTNESS)
 
-FLASH_MS = 500
-RYK_MS = 500
+FLASH_MS = 1000
+RYK_MS   = 666
 
 MODES = {
     "GREEN", "YELLOW", "RED", "BLUE",
     "FLASH_RED", "FLASH_YELLOW", "FLASH_RYK", "OFF",
 }
 
-GLANCE = {
-    25: "WX",
-    24: "QK",
-    23: "FX",
-    22: "ST",
-    21: "OL",
-    20: None,
-}
 RYK_GROUPS = ("WX", "QK")
 
 bl = None
@@ -84,8 +84,8 @@ _phase = 0
 _next = time.ticks_ms()
 _pending_mode = None
 _master_ip = "--"
-_net_line = ("INTERNET UNTESTED", BLUE)
-_alert_line = ("", BLACK)
+_net_line = ("INTERNET UNTESTED", TEXT_BLUE)
+_alert_line = ("", TEXT_BLACK)
 _items = []
 _slots = {
     ("WX", "Y"): "",
@@ -223,8 +223,14 @@ def _flash_rgb(band, step):
         return LED_YELLOW if (step % 2) == 0 else LED_BLACK
     return LED_BLACK
 
+def _glance_group(idx):
+    g = idx - RING_N
+    if 0 <= g < len(GLANCE_LABELS):
+        return GLANCE_LABELS[g]
+    return None
+
 def _glance_rgb(idx, step):
-    return _flash_rgb(_item_band(GLANCE.get(idx)), step)
+    return _flash_rgb(_item_band(_glance_group(idx)), step)
 
 def _paint_leds(rgb, step=0):
     if not USE_LEDS:
@@ -249,31 +255,31 @@ def black():
 def _update_status_from_mode(name):
     global _net_line, _alert_line, _items
     if name == "GREEN":
-        _net_line = ("INTERNET GOOD", GREEN)
-        _alert_line = ("", BLACK)
+        _net_line = ("INTERNET GOOD", TEXT_GREEN)
+        _alert_line = ("", TEXT_BLACK)
         _items = []
     elif name == "YELLOW":
-        _net_line = ("INTERNET ISSUES", YELLOW)
-        _alert_line = ("", BLACK)
+        _net_line = ("INTERNET ISSUES", TEXT_YELLOW)
+        _alert_line = ("", TEXT_BLACK)
         _items = []
     elif name == "RED":
-        _net_line = ("INTERNET DOWN", RED)
-        _alert_line = ("", BLACK)
+        _net_line = ("INTERNET DOWN", TEXT_RED)
+        _alert_line = ("", TEXT_BLACK)
         _items = []
     elif name == "BLUE":
-        _net_line = ("INTERNET UNTESTED", BLUE)
-        _alert_line = ("", BLACK)
+        _net_line = ("INTERNET UNTESTED", TEXT_BLUE)
+        _alert_line = ("", TEXT_BLACK)
         _items = []
     elif name == "OFF":
-        _net_line = ("", BLACK)
-        _alert_line = ("", BLACK)
+        _net_line = ("", TEXT_BLACK)
+        _alert_line = ("", TEXT_BLACK)
         _items = []
     elif name == "FLASH_YELLOW":
-        _alert_line = ("ALERT YELLOW", YELLOW)
+        _alert_line = ("ALERT YELLOW", TEXT_YELLOW)
     elif name == "FLASH_RED":
-        _alert_line = ("ALERT RED", RED)
+        _alert_line = ("ALERT RED", TEXT_RED)
     elif name == "FLASH_RYK":
-        _alert_line = ("ALERT RED/YELLOW", RED)
+        _alert_line = ("ALERT RED/YELLOW", TEXT_RED)
 
 def _leds_for_mode(name, step=0):
     if name == "GREEN":
@@ -314,14 +320,14 @@ def _paint_slot(y, col, group, band, color):
         return
     x = 8 + col * 8
     if new:
-        tft.draw_text8x8(x, y, (new + SLOT_PAD)[:SLOT_CHARS], color, BLACK)
+        tft.draw_text8x8(x, y, (new + SLOT_PAD)[:SLOT_CHARS], color, TEXT_BLACK)
     else:
-        tft.draw_text8x8(x, y, SLOT_PAD, BLACK, BLACK)
+        tft.draw_text8x8(x, y, SLOT_PAD, TEXT_BLACK, TEXT_BLACK)
     _slots[key] = new
 
 def _paint_group(y, group):
-    _paint_slot(y, 0,  group, "Y", YELLOW)
-    _paint_slot(y, 10, group, "R", RED)
+    _paint_slot(y, 0,  group, "Y", TEXT_YELLOW)
+    _paint_slot(y, 10, group, "R", TEXT_RED)
 
 def _paint_status():
     global _tft_ready
@@ -335,16 +341,16 @@ def _paint_status():
         return
     try:
         if not _tft_ready:
-            tft.clear(BLACK)
+            tft.clear(TEXT_BLACK)
             _tft_ready = True
         cyd_line = "CYD " + _cyd_ip()
         pi_line  = "PI  " + _master_ip
         net_s = (_net_line[0] + "                    ")[:20]
         al_s  = (_alert_line[0] + "                    ")[:20]
-        tft.draw_text8x8(8, 16, cyd_line, WHITE, BLACK)
-        tft.draw_text8x8(8, 32, pi_line,  WHITE, BLACK)
-        tft.draw_text8x8(8, 56, net_s, _net_line[1], BLACK)
-        tft.draw_text8x8(8, 72, al_s,  _alert_line[1], BLACK)
+        tft.draw_text8x8(8, 16, cyd_line, TEXT_WHITE, TEXT_BLACK)
+        tft.draw_text8x8(8, 32, pi_line,  TEXT_WHITE, TEXT_BLACK)
+        tft.draw_text8x8(8, 56, net_s, _net_line[1], TEXT_BLACK)
+        tft.draw_text8x8(8, 72, al_s,  _alert_line[1], TEXT_BLACK)
         _paint_group(88,  "WX")
         _paint_group(104, "QK")
         _paint_group(120, "FX")
@@ -354,7 +360,7 @@ def _paint_status():
         print("TFT text", e)
 
 def _glance_busy():
-    for group in GLANCE.values():
+    for group in GLANCE_LABELS:
         if _item_band(group):
             return True
     return False
