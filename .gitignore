@@ -21,3 +21,4 @@ venv/
 EOF
 Globe/secrets.py
 CONTEXT_PROMPT.txt
+Globe/Binary Images/
