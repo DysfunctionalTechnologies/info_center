@@ -60,9 +60,16 @@ def _poll_hello():
         return
     if not isinstance(msg, dict):
         return
-    if str(msg.get("cmd", "")).lower() != "hello":
-        return
+    cmd = str(msg.get("cmd", "")).lower()
     src = addr[0]
+    if cmd == "beacon":
+        if _locked == src:
+            _seen = now
+        return
+    if cmd != "hello":
+        return
+    if msg.get("paired"):
+        return
     if _locked and src != _locked:
         logger.info("globe hello ignore %s locked %s", src, _locked)
         return
@@ -78,7 +85,7 @@ def _poll_hello():
         logger.info("globe here -> %s sku=%s", src, msg.get("sku"))
     except OSError as e:
         logger.warning("globe here: %s", e)
-                
+                        
 def current_globe_mode():
     now = time.monotonic()
     high = now < getattr(info_center, "alert_high_until", 0.0)

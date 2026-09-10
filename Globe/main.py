@@ -94,26 +94,21 @@ master = None
 boot_id = time.ticks_ms() & 0xFFFF
 print("INFO_CENTER_GLOBE udp :%d sku %s" % (UDP_PORT, P["SKU"]))
 
-def send_hello():
-    if not wlan.isconnected():
-        print("hello skip, no wifi")
-        return
+def send_hello(cmd="hello"):
     ip = _my_ip(wlan)
     msg = {
         "v": 1,
-        "cmd": "hello",
+        "cmd": cmd,
         "sku": P["SKU"],
         "n": globe.LED_N,
         "boot": boot_id,
         "ip": ip,
+        "paired": 1 if master else 0,
     }
     raw = json.dumps(msg).encode("ascii")
-    try:
-        sock.sendto(raw, ("255.255.255.255", UDP_PORT))
-        print("hello", ip)
-    except OSError as e:
-        print("hello fail", e)
-
+    sock.sendto(raw, ("255.255.255.255", UDP_PORT))
+    print(cmd, ip, "paired" if master else "single")
+    
 def send_ack(addr):
     raw = json.dumps({"v": 1, "cmd": "ack"}).encode("ascii")
     try:
@@ -190,8 +185,8 @@ while True:
     wait = HELLO_MS if master is None else BEACON_MS
     if time.ticks_diff(time.ticks_ms(), last_hello) >= 0:
         last_hello = time.ticks_add(time.ticks_ms(), wait)
-        send_hello()
-    
+        send_hello("hello" if master is None else "beacon")
+        
     if time.ticks_diff(time.ticks_ms(), last_pkt) > FAILSAFE_MS:
         last_seq = None
         last_pkt = time.ticks_ms()
