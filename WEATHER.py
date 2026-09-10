@@ -93,7 +93,7 @@ def build_weather_message_and_colors():
 
     loc = (info_center.weather_location or "").strip().upper()
     add(loc if loc else "UNKNOWN", COLOR_CYAN, msg_chars, colors)
-    add("-", COLOR_WHITE, msg_chars, colors)
+    add(" ", COLOR_WHITE, msg_chars, colors)
 
     use_c = bool(getattr(info_center, "temp_celsius", True))
     unit = "C" if use_c else "F"
@@ -107,12 +107,27 @@ def build_weather_message_and_colors():
         add_number(f"{whole}.{frac}", msg_chars, colors)
         add(chr(CHAR_DEGREE) + unit, COLOR_WHITE, msg_chars, colors)
 
-    add("IN/OUT:", COLOR_WHITE, msg_chars, colors)
+    add("INDOOR:", COLOR_WHITE, msg_chars, colors)
     add_one_temp(info_center.temp_c, info_center.temp_f)
-    add("/", COLOR_WHITE, msg_chars, colors)
-    add_one_temp(info_center.weather_temp_c, info_center.weather_temp_f)
+    add(" RH:", COLOR_WHITE, msg_chars, colors)
+    rh = getattr(info_center, "local_rh", None)
+    if rh is None:
+        add("--%", COLOR_WHITE, msg_chars, colors)
+    else:
+        add_number(str(int(rh)), msg_chars, colors)
+        add("%", COLOR_WHITE, msg_chars, colors)
+    add(" HPA:", COLOR_WHITE, msg_chars, colors)
+    hpa = getattr(info_center, "local_hpa", None)
+    if hpa is None:
+        add("----.-", COLOR_WHITE, msg_chars, colors)
+    else:
+        add_number("%.1f" % hpa, msg_chars, colors)
     add(" ", COLOR_WHITE, msg_chars, colors)
 
+    add("OUTDOOR:", COLOR_WHITE, msg_chars, colors)
+    add_one_temp(info_center.weather_temp_c, info_center.weather_temp_f)
+    add(" ", COLOR_WHITE, msg_chars, colors)
+    
     add("WIND:", COLOR_WHITE, msg_chars, colors)
     add_number(f"{info_center.weather_wind_kmh:.0f}", msg_chars, colors)
     add("KPH ", COLOR_WHITE, msg_chars, colors)
@@ -127,9 +142,9 @@ def build_weather_message_and_colors():
     add(compass, COLOR_CYAN, msg_chars, colors)
     add(" ", COLOR_WHITE, msg_chars, colors)
 
-    add("RH:", COLOR_WHITE, msg_chars, colors)
-    add_number(f"{info_center.weather_humidity}", msg_chars, colors)
-    add("% ", COLOR_WHITE, msg_chars, colors)
+#    add("RH:", COLOR_WHITE, msg_chars, colors)
+#    add_number(f"{info_center.weather_humidity}", msg_chars, colors)
+#    add("% ", COLOR_WHITE, msg_chars, colors)
 
     desc = WMO_CODES.get(info_center.weather_code, "UNKNOWN")
     info_center.weather_description = desc
@@ -151,6 +166,7 @@ def display_weather():
     fresh = is_data_fresh(info_center.weather_last_update, 1800.0)
 
     need_rebuild = (
+        getattr(info_center, "local_wx_last_update", 0) > wx.last_built or
         not info_center.pattern_init or
         info_center.weather_last_update > wx.last_built or
         not fresh
@@ -168,7 +184,8 @@ def display_weather():
 
         wx.msg        = msg
         wx.colors     = colors
-        wx.last_built = info_center.weather_last_update
+        wx.last_built = time.monotonic()
+#        wx.last_built = info_center.weather_last_update
 
         continuous_scroll_message(
             string_to_scroll=msg,

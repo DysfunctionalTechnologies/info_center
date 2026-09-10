@@ -10,6 +10,7 @@
 import subprocess
 import threading
 import time
+import logging
 
 # Project Imports
 from   CONFIG         import info_center
@@ -103,7 +104,25 @@ def _ping_worker(gen):
     with _ping_lock:
         if gen == _ping_gen:
             _ping_done = True
-
+            st = info_center.internet_status
+            if st in (NETWORK_PROBLEM, NETWORK_BAD):
+                bits = []
+                for i, s in enumerate(ping_status):
+                    if s == NETWORK_GOOD:
+                        bits.append("G")
+                    elif s == NETWORK_BAD:
+                        bits.append("B")
+                    else:
+                        bits.append("U")
+                sites = info_center.internet_test_sites
+                log = logging.getLogger(__name__)
+                log.warning(
+                    "inet %s pings=%s sites=%s",
+                    "BAD" if st == NETWORK_BAD else "YELLOW",
+                    "".join(bits),
+                    sites,
+                )
+                
 def display_internet_monitor(duration=28.0):
     global _ping_gen, _ping_done, _end_armed
 

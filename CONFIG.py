@@ -298,6 +298,10 @@ class InfoCenterState:
         self.fetcher                  = FetcherState()
         self.color                    = ColorPanelState()
 
+        self.local_rh                 = None
+        self.local_hpa                = None
+        self.local_wx_last_update     = 0.0
+        
         self.weather_lat              = 15.12736
         self.weather_lon              = 121.00056
         self.weather_location         = "SAN MIGUEL"
