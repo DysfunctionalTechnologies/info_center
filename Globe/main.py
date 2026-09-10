@@ -56,7 +56,7 @@ def parse_packet(msg):
     cmd = str(msg.get("cmd", "globe")).lower()
     if cmd == "off":
         return "OFF"
-    if cmd in ("hello", "here", "ack"):
+    if cmd in ("hello", "here", "ack", "beacon"):
         return None
     return str(msg.get("mode", "BLUE")).upper()
 
@@ -135,6 +135,8 @@ while True:
             cmd = str(msg.get("cmd", "globe")).lower()
             if cmd == "hello":
                 pass
+            elif cmd == "beacon":
+                pass
             elif cmd == "here":
                 if addr:
                     if master and addr[0] != master:
@@ -161,32 +163,22 @@ while True:
                             last_seq = seq
                     except Exception:
                         stale = True
-                if master and addr and addr[0] != master:
+                if master is None or (addr and addr[0] != master):
                     stale = True
                 if not stale:
                     name = parse_packet(msg)
                     if name:
-                        if addr:
-                            if master is None:
-                                master = addr[0]
-                            globe.set_master(addr[0])
+                        globe.set_master(master)
                         globe.set_mode(name)
                         globe.set_alerts(msg.get("alerts", []))
                         last_pkt = time.ticks_ms()
                         print(addr, globe.mode, msg.get("alerts", []))
 
-    if not wlan.isconnected():
-        if time.ticks_diff(time.ticks_ms(), last_wifi) >= WIFI_RETRY_MS:
-            last_wifi = time.ticks_ms()
-            print("wifi retry")
-            wlan = wifi_connect()
-            print("wlan", wlan.ifconfig(), wlan.status())
-
     wait = HELLO_MS if master is None else BEACON_MS
     if time.ticks_diff(time.ticks_ms(), last_hello) >= 0:
         last_hello = time.ticks_add(time.ticks_ms(), wait)
         send_hello("hello" if master is None else "beacon")
-        
+
     if time.ticks_diff(time.ticks_ms(), last_pkt) > FAILSAFE_MS:
         last_seq = None
         last_pkt = time.ticks_ms()

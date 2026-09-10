@@ -12,6 +12,8 @@ import threading
 import time
 import logging
 
+logger = logging.getLogger(__name__)
+
 # Project Imports
 from   CONFIG         import info_center
 from   CONFIG         import LOWER_TEXT_ROW
@@ -42,6 +44,13 @@ _ping_gen  = 0
 _ping_done = False
 _end_armed = False
 
+def _counts():
+    d = info_center.ping_counts
+    for site in info_center.internet_test_sites:
+        if site not in d:
+            d[site] = {"bad": 0, "total": 0}
+    return d
+    
 def status_to_color(status):
     if status == NETWORK_BAD:
         return COLOR_RED
@@ -100,29 +109,33 @@ def _ping_worker(gen):
                 return
             ping_status[step] = NETWORK_GOOD if success else NETWORK_BAD
             _apply_overall_status(step + 1)
+            c = _counts()[site]
+            c["total"] += 1
+            if not success:
+                c["bad"] += 1
         time.sleep(1.5)
     with _ping_lock:
         if gen == _ping_gen:
             _ping_done = True
             st = info_center.internet_status
             if st in (NETWORK_PROBLEM, NETWORK_BAD):
+                parts = []
+                for site in sites:
+                    c = _counts()[site]
+                    parts.append("%s %d/%d" % (site, c["bad"], c["total"]))
                 bits = []
-                for i, s in enumerate(ping_status):
-                    if s == NETWORK_GOOD:
-                        bits.append("G")
-                    elif s == NETWORK_BAD:
-                        bits.append("B")
-                    else:
-                        bits.append("U")
-                sites = info_center.internet_test_sites
-                log = logging.getLogger(__name__)
-                log.warning(
-                    "inet %s pings=%s sites=%s",
+                for s in ping_status:
+                    bits.append(
+                        "G" if s == NETWORK_GOOD else
+                        "B" if s == NETWORK_BAD else "U"
+                    )
+                logger.warning(
+                    "inet %s pings=%s %s",
                     "BAD" if st == NETWORK_BAD else "YELLOW",
                     "".join(bits),
-                    sites,
+                    " ".join(parts),
                 )
-                
+                                
 def display_internet_monitor(duration=28.0):
     global _ping_gen, _ping_done, _end_armed
 

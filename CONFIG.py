@@ -281,9 +281,14 @@ class InfoCenterState:
         self.temp_f                   = 99.9
 
         self.internet_status          = NETWORK_UNTESTED
-        self.internet_test_sites      = ["www.google.com", "www.x.com",
-                                         "www.microsoft.com", "www.lazada.com"]
-
+        self.internet_test_sites      = [
+            "1.1.1.1",
+            "8.8.8.8",
+            "9.9.9.9",
+            "208.67.222.222"
+        ]
+        self.ping_counts              = {}
+        
         self.power_level              = POWER_ON
 
         self.upper                    = UpperPanelState()

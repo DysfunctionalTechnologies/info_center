@@ -75,6 +75,11 @@ def _poll_hello():
         return
     if _locked == src:
         _seen = now
+        here = json.dumps({"v": 1, "cmd": "here", "pi": src}).encode("ascii")
+        try:
+            _sock.sendto(here, addr)
+        except OSError:
+            pass
         return
     _locked = src
     _peer = src
@@ -85,7 +90,7 @@ def _poll_hello():
         logger.info("globe here -> %s sku=%s", src, msg.get("sku"))
     except OSError as e:
         logger.warning("globe here: %s", e)
-                        
+                                
 def current_globe_mode():
     now = time.monotonic()
     high = now < getattr(info_center, "alert_high_until", 0.0)

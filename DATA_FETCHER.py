@@ -606,12 +606,6 @@ def _safe_get(url, timeout=12):
         logger.warning("Network fetch failed: %s", e)
         return None
 
-#def update_indoor_temp():
-#    c, f = read_temp()
-#    with info_center.lock:
-#        info_center.temp_c = c
-#        info_center.temp_f = f
-
 def _fetcher_loop():
     weather_ok   = False
     quake_ok     = False
