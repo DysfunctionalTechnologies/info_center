@@ -21,6 +21,7 @@ DEFAULTS = {
     "GLOBE_HOST": "192.168.0.223",
     "DIAG_BRIGHTNESS": "",
     "DISPLAY_NAME": "",
+    "INDOOR_SENSOR": "AHT",
 }
 
 ALLOWED_LAYOUTS = ("16x16", "8x32")
@@ -64,6 +65,8 @@ def _validate(data):
     clean["GLOBE_HOST"] = str(clean.get("GLOBE_HOST", DEFAULTS["GLOBE_HOST"])).strip() or DEFAULTS["GLOBE_HOST"]
     clean["DIAG_BRIGHTNESS"] = str(clean.get("DIAG_BRIGHTNESS", "")).strip()
     clean["DISPLAY_NAME"] = str(clean.get("DISPLAY_NAME", "")).strip()
+    sensor = str(clean.get("INDOOR_SENSOR", "AHT")).strip().upper()
+    clean["INDOOR_SENSOR"] = "DS18" if sensor == "DS18" else "AHT"
     return clean
 
 
@@ -95,6 +98,7 @@ def save_platform(fields):
         "GLOBE_HOST=%s" % current["GLOBE_HOST"],
         "DIAG_BRIGHTNESS=%s" % current["DIAG_BRIGHTNESS"],
         "DISPLAY_NAME=%s" % current["DISPLAY_NAME"],
+        "INDOOR_SENSOR=%s" % current["INDOOR_SENSOR"],
         "",
     ]
     tmp = PLATFORM_PATH + ".tmp"
@@ -122,7 +126,9 @@ def globe_host():
 
 def display_name():
     return load_platform()[0]["DISPLAY_NAME"]
-
+    
+def indoor_sensor():
+    return load_platform()[0]["INDOOR_SENSOR"]
 
 #----------------------------------------------------------#
 if __name__ == "__main__":

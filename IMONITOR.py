@@ -74,15 +74,14 @@ def update_internet_panel():
     print_char(CHAR_T,     status_to_color(ping_status[7]), COLOR_BLACK, start_col + 27, start_row)
 
 def _apply_overall_status(done):
-    goods = sum(1 for s in ping_status[:done] if s == NETWORK_GOOD)
-    bads  = sum(1 for s in ping_status[:done] if s == NETWORK_BAD)
-    if bads == done:
+    bads = sum(1 for s in ping_status[:done] if s == NETWORK_BAD)
+    if done >= TOTAL_PINGS and bads >= TOTAL_PINGS:
         info_center.internet_status = NETWORK_BAD
-    elif goods == done:
-        info_center.internet_status = NETWORK_GOOD
-    else:
+    elif bads >= 3:
         info_center.internet_status = NETWORK_PROBLEM
-
+    else:
+        info_center.internet_status = NETWORK_GOOD
+        
 def _ping_one(site):
     try:
         result = subprocess.run(

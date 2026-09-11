@@ -63,47 +63,60 @@ class _FetchRetry:
         self.next_try = time.monotonic() + delay
         logger.warning("%s fetch failed – retry in %.0fs", self.name, delay)
 
+FAKE_RH  = 50
+FAKE_HPA = 1013.2
+
 def update_indoor_temp():
-    wx = None
-    try:
-        wx = read_local_wx()
-    except Exception as e:
-        logger.warning("local_wx: %s", e)
+    use_aht = bool(getattr(info_center, "use_aht", True))
+
+    if use_aht:
         wx = None
+        try:
+            wx = read_local_wx()
+        except Exception as e:
+            logger.warning("local_wx: %s", e)
+            wx = None
 
-    rh = wx.get("rh") if wx else None
-    hpa = wx.get("hpa") if wx else None
-    t_aht = wx.get("t_aht") if wx else None
+        rh = wx.get("rh") if wx else None
+        hpa = wx.get("hpa") if wx else None
+        t_aht = wx.get("t_aht") if wx else None
 
-    if t_aht is not None and t_aht > -40.0:
-        new_rh = int(round(rh)) if rh is not None else None
-        new_hpa = round(float(hpa), 1) if hpa is not None else None
-        new_t = round(float(t_aht), 1)
-        with info_center.lock:
-            old_rh = getattr(info_center, "local_rh", None)
-            old_hpa = getattr(info_center, "local_hpa", None)
-            old_t = round(float(info_center.temp_c), 1)
-            changed = (
-                new_rh != old_rh or
-                (new_hpa is not None and old_hpa is not None and abs(new_hpa - old_hpa) >= 1.0) or
-                (new_hpa is not None and old_hpa is None) or
-                abs(new_t - old_t) >= 0.5
-            )
-            if new_rh is not None:
-                info_center.local_rh = new_rh
-            if new_hpa is not None:
-                info_center.local_hpa = new_hpa
-            info_center.temp_c = float(t_aht)
-            info_center.temp_f = float(t_aht) * 9.0 / 5.0 + 32.0
-            if changed:
-                info_center.local_wx_last_update = time.monotonic()
-        return
+        if t_aht is not None and t_aht > -40.0:
+            new_rh = int(round(rh)) if rh is not None else None
+            new_hpa = round(float(hpa), 1) if hpa is not None else None
+            new_t = round(float(t_aht), 1)
+            with info_center.lock:
+                old_rh = getattr(info_center, "local_rh", None)
+                old_hpa = getattr(info_center, "local_hpa", None)
+                old_t = round(float(info_center.temp_c), 1)
+                changed = (
+                    new_rh != old_rh or
+                    (new_hpa is not None and old_hpa is not None
+                     and abs(new_hpa - old_hpa) >= 1.0) or
+                    (new_hpa is not None and old_hpa is None) or
+                    abs(new_t - old_t) >= 0.5
+                )
+                if new_rh is not None:
+                    info_center.local_rh = new_rh
+                if new_hpa is not None:
+                    info_center.local_hpa = new_hpa
+                info_center.temp_c = float(t_aht)
+                info_center.temp_f = float(t_aht) * 9.0 / 5.0 + 32.0
+                if changed:
+                    info_center.local_wx_last_update = time.monotonic()
+            return
 
     c, f = read_temp()
     with info_center.lock:
+        old_t = round(float(info_center.temp_c), 1)
+        new_t = round(float(c), 1)
         info_center.temp_c = c
         info_center.temp_f = f
-                
+        info_center.local_rh = FAKE_RH
+        info_center.local_hpa = FAKE_HPA
+        if (not use_aht) or abs(new_t - old_t) >= 0.5:
+            info_center.local_wx_last_update = time.monotonic()
+            
 def is_data_fresh(last_update, max_age):
     if last_update <= 0.0:
         return False

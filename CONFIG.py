@@ -374,7 +374,8 @@ class InfoCenterState:
         self.web_alert_weather        = False
         self.web_alert_quake          = False
         self.lock                     = threading.RLock()
-
+        self.use_aht                  = True
+        
         persisted                     = eeprom.load()
 
         self.auto_brightness          = persisted["auto_brightness"]
@@ -404,6 +405,7 @@ class InfoCenterState:
         self.stock_symbols            = syms[:5]
 
         _plat, _plat_present          = load_platform()
+        self.use_aht                  = _plat.get("INDOOR_SENSOR", "AHT") != "DS18"
         if _plat_present:
             self.globe_push_enabled   = _plat["GLOBE_PUSH"] == "1"
         else:

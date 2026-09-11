@@ -40,6 +40,7 @@ HTML = """
 
     <button id="militaryBtn" class="debug-off" onclick="toggleMilitary()">MILITARY TIME: --</button>
     <button id="tempUnitBtn" class="debug-off" onclick="toggleTempUnit()">TEMP: --</button>
+    <button id="indoorSensBtn" class="debug-off" onclick="toggleIndoorSensor()">INDOOR: --</button>
     <button id="globePushBtn" class="debug-off" onclick="toggleGlobePush()">PUSH GLOBE: OFF</button>
 
     <label>PRIMARY</label>
@@ -84,6 +85,7 @@ HTML = """
         window._autoBright = false;
         window._military = false;
         window._tempC = true;
+        window._useAht = true;
         window._globePush = false;
         window._showPacman = true;
         window._showWeather = true;
@@ -97,6 +99,7 @@ HTML = """
         const setNightBtn = document.getElementById("setNightBtn");
         const militaryBtn = document.getElementById("militaryBtn");
         const tempUnitBtn = document.getElementById("tempUnitBtn");
+        const indoorSensBtn = document.getElementById("indoorSensBtn");
         const globePushBtn = document.getElementById("globePushBtn");
         const fxPrimary = document.getElementById("fxPrimary");
         const fxSecondary = document.getElementById("fxSecondary");
@@ -104,6 +107,9 @@ HTML = """
 
         function toggleGlobePush() {
             call('/set_globe_push?value=' + (window._globePush ? 0 : 1));
+        }
+        function toggleIndoorSensor() {
+            call('/set_use_aht?value=' + (window._useAht ? 0 : 1));
         }
         function normCcy(raw, fallback) {
             const s = String(raw || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
@@ -185,6 +191,7 @@ HTML = """
             window._autoBright = !!data.auto_brightness;
             window._military = !!data.military_time;
             window._tempC = data.temp_celsius !== false;
+            window._useAht = data.use_aht !== false;
             document.getElementById("status").className = "status " + cls;
             document.getElementById("status").innerHTML =
                 "Brightness: <b>" + data.brightness + "</b><br>" +
@@ -192,6 +199,7 @@ HTML = """
                 "Day / Night: <b>" + data.day_brightness + " / " + data.night_brightness + "</b><br>" +
                 "Military: <b>" + (data.military_time ? "ON" : "OFF") + "</b><br>" +
                 "Temp: <b>" + (window._tempC ? "C" : "F") + "</b><br>" +
+                "Indoor: <b>" + (window._useAht ? "AHT/BMP" : "DS18") + "</b><br>" +
                 "Power: <b>" + powerText + "</b><br>" +
                 "Internet: <b style='color:" + data.internet_color + "'>" + data.internet + "</b><br>" +
                 "Globe: <b style='color:" + data.globe_color + "'>" + data.globe + "</b>";
@@ -217,6 +225,10 @@ HTML = """
             if (tempUnitBtn) {
                 tempUnitBtn.textContent = "TEMP: " + (window._tempC ? "C" : "F");
                 tempUnitBtn.className = window._tempC ? "debug-on" : "debug-off";
+            }
+            if (indoorSensBtn) {
+                indoorSensBtn.textContent = "INDOOR: " + (window._useAht ? "AHT/BMP" : "DS18");
+                indoorSensBtn.className = window._useAht ? "debug-on" : "debug-off";
             }
             if (fxPrimary && document.activeElement !== fxPrimary) {
                 fxPrimary.value = data.exchange_primary || data.exchange_base || "USD";

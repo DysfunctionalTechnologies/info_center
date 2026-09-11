@@ -505,6 +505,7 @@ def status():
         "auto_brightness": bool(info_center.auto_brightness),
         "military_time": bool(info_center.military_time),
         "temp_celsius": bool(getattr(info_center, "temp_celsius", True)),
+        "use_aht": bool(getattr(info_center, "use_aht", True)),
         "day_brightness": int(getattr(info_center, "day_brightness", 63)),
         "night_brightness": int(getattr(info_center, "night_brightness", 31)),
         "debug_mode": bool(info_center.debug_mode),
@@ -544,7 +545,24 @@ def status():
         "stock_symbols":      symbols[:5],
         "stock_valid":        valid[:5],
     })
-
+    
+@app.route("/set_use_aht", methods=["POST"])
+def route_set_use_aht():
+    if not is_authenticated():
+        return _deny_json()
+    raw = str(request.args.get("value", "1")).lower()
+    use_aht = raw in ("1", "true", "yes", "on")
+    info_center.use_aht = use_aht
+    try:
+        save_platform({"INDOOR_SENSOR": "AHT" if use_aht else "DS18"})
+    except Exception:
+        logger.warning("platform INDOOR_SENSOR save failed", exc_info=True)
+    with info_center.lock:
+        info_center.weather.last_built = 0.0
+        info_center.local_wx_last_update = 0.0
+    logger.info("Indoor sensor → %s", "AHT" if use_aht else "DS18")
+    return status()
+    
 @app.route("/set_globe_push", methods=["POST"])
 def route_set_globe_push():
     if not is_authenticated():
